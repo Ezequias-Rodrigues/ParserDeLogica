@@ -53,7 +53,11 @@ def extract_op(text, op):
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op))
     return result
-def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
+def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
+    pattern = rf'([^{op}]+)\{op}([^{op}]+)'
+    matches = regex.findall(pattern, expr, regex.VERSION1)
+    print(matches)
+
     pass
 def tokenize(matches):
     global token_count
@@ -83,6 +87,7 @@ all_matches = extract_op(text_implication, ">")[::-1] #Invertendo a lista para p
 tokenize(all_matches)
 
 print(tokens)
+solve_exp("a.b", ".")
 #for match in all_matches:
    
 
