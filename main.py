@@ -4,9 +4,9 @@ Simbolos que pretendo usar:
 - `.` para AND
 - `+` para OR
 - `>` para IMPLICAÇÃO
+- `=` para BICONDICIONAL
 - `~` para NEGACÃO
 - `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.
-- TALVEZ, MUITO TALVEZ, eu implemente bicondicionais, mas vamos ver o quão difícil é lidar com as outras operações primeiro.
 '''
 
 token_count = 0
@@ -54,9 +54,20 @@ def extract_op(text, op):
         result.extend(extract_op(matches[1], op))
     return result
 def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
-    pattern = rf'([^{op}]+)\{op}([^{op}]+)'
-    matches = regex.findall(pattern, expr, regex.VERSION1)
-    print(matches)
+    pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
+    matches = regex.findall(pattern, expr, regex.VERSION1)[0]
+    #mockando valores booleanos para testar a função, depois eu substituo pelos tokens
+    mtokens = {matches[0]: False, matches[1]: False}
+
+    match op:
+        case ".":
+            return mtokens[matches[0]] and mtokens[matches[1]]
+        case "+":  
+            return mtokens[matches[0]] or mtokens[matches[1]]
+        case ">":
+            return not mtokens[matches[0]] or mtokens[matches[1]]
+        case "=":
+            return mtokens[matches[0]] == mtokens[matches[1]]
 
     pass
 def tokenize(matches):
@@ -86,8 +97,8 @@ all_matches = extract_op(text_implication, ">")[::-1] #Invertendo a lista para p
  #   implication_token[match.count(">")] = match  #Deixar essas linhas fora por hora
 tokenize(all_matches)
 
-print(tokens)
-solve_exp("a.b", ".")
+#print(tokens)
+print(solve_exp("a+b", "+"))
 #for match in all_matches:
    
 
