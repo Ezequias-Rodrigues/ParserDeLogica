@@ -11,9 +11,13 @@ Simbolos que pretendo usar:
 
 token_count = 0
 
-tokens = {}  #tokens[VALOR HEX TO token_count] = VALOR ORIGINAL
+tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
+var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
 nests_token = {} #nests_token[X] = [token1, token2, ...] onde X é representa o nivel de nesting que a expressão possui, e token1, token2, ... são os tokens que estão naquele nível de nesting.
 implication_token = {} #mesmo esquema mas com >
+or_token = {} 
+and_token = {} 
+
 def extract_all_parentheses(text):
     '''
     Não pretendo limitar a profundidade do nesting,
@@ -45,17 +49,19 @@ def extract_op(text, op):
         Desde já, peço seu perdão
     '''
     result = [text]
-    matches = text.split(">",1)
+    matches = text.split(op,1)
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op))
        
     return result
 text = " ((a.b)+c) (a.~(b>c)+d) ((~a+(b.(c+d))>e)>f) x.y>z i>j>k"
-text_implication = "i>j>k>l"
+text_implication = "i>j>c.k>l"
 all_matches = extract_op(text_implication, ">")
+
 for match in all_matches:
     #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
     implication_token[match.count(">")] = match 
+
     print(implication_token)
    #print( nests_token)
     print(f"Match: {match}")
