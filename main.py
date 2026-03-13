@@ -13,6 +13,7 @@ token_count = 0
 
 tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
 var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
+variable_lists = []
 nests_token = {} #nests_token[X] = [token1, token2, ...] onde X é representa o nivel de nesting que a expressão possui, e token1, token2, ... são os tokens que estão naquele nível de nesting.
 implication_token = {} #mesmo esquema mas com >
 or_token = {} 
@@ -47,12 +48,12 @@ def extract_all_parentheses(text):
 def extract_op(text, op):
     #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
     #   Desde já, peço seu perdão
-    #
+
     result = [text]
     matches = text.split(op,1)
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op))
-    return result
+    return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
 def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     matches = regex.findall(pattern, expr, regex.VERSION1)[0]
@@ -70,19 +71,28 @@ def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser r
             return mtokens[matches[0]] == mtokens[matches[1]]
 
     pass
-def tokenize(matches):
+def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
+    pattern = r'[aA-zZ]+'
+    matches = regex.findall(pattern, text, regex.VERSION1)
+    global token_count
+    for match in matches:
+        token_value = hex(token_count)  
+        tokens[token_value] = [match, False]  
+        var_to_tokens[match] = token_value  #
+        token_count += 1
+        text = text.replace(match, token_value)
+        variable_lists.append(match)
+    return text
+def tokenize_exp(matches):
     global token_count
     last_var = None #Creio eu que o valor do token mais recente seja o mais aninhado, então ele deve ser o primeiro a ser substituído
     last_var_literal = "BCC"
     for match in matches:
         token_value = hex(token_count)  
-        
-        #print(match.find(last_var_literal), match, " ", last_var_literal)
         if(last_var and match.find(last_var_literal) != -1):
             aux = last_var_literal
             last_var_literal = match
             match = match.replace(aux, var_to_tokens[last_var])
-            
         tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
         var_to_tokens[match] = token_value  
         last_var = match
@@ -90,15 +100,15 @@ def tokenize(matches):
             last_var_literal = match
         token_count += 1  
 
-text = " ((a.b)+c) (a.~(b>c)+d) ((~a+(b.(c+d))>e)>f) x.y>z i>j>k"
-text_implication = "i>j>c.k>l"
-all_matches = extract_op(text_implication, ">")[::-1] #Invertendo a lista para poder tokenizar do menor para o maior 
+text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
+text_implication = "i>c+j>a.c.k>l"
+all_matches = extract_op(text_implication, ">") 
  #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
- #   implication_token[match.count(">")] = match  #Deixar essas linhas fora por hora
-tokenize(all_matches)
 
-#print(tokens)
-print(solve_exp("a+b", "+"))
+exp = extract_op(tokenize_var(text_implication), ">")
+tokenize_exp(exp)
+print(tokens)
+
 #for match in all_matches:
    
 
