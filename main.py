@@ -52,16 +52,40 @@ def extract_op(text, op):
     matches = text.split(op,1)
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op))
-       
     return result
+def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
+    pass
+def tokenize(matches):
+    global token_count
+    last_var = None #Creio eu que o valor do token mais recente seja o mais aninhado, então ele deve ser o primeiro a ser substituído
+    last_var_literal = "BCC"
+    for match in matches:
+        token_value = hex(token_count)  
+        
+        #print(match.find(last_var_literal), match, " ", last_var_literal)
+        if(last_var and match.find(last_var_literal) != -1):
+            aux = last_var_literal
+            last_var_literal = match
+            match = match.replace(aux, var_to_tokens[last_var])
+            
+        tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
+        var_to_tokens[match] = token_value  
+        last_var = match
+        if(last_var_literal == "BCC"):
+            last_var_literal = match
+        token_count += 1  
+
 text = " ((a.b)+c) (a.~(b>c)+d) ((~a+(b.(c+d))>e)>f) x.y>z i>j>k"
 text_implication = "i>j>c.k>l"
-all_matches = extract_op(text_implication, ">")
+all_matches = extract_op(text_implication, ">")[::-1] #Invertendo a lista para poder tokenizar do menor para o maior 
+ #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
+ #   implication_token[match.count(">")] = match  #Deixar essas linhas fora por hora
+tokenize(all_matches)
 
-for match in all_matches:
-    #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
-    implication_token[match.count(">")] = match 
+print(tokens)
+#for match in all_matches:
+   
 
-    print(implication_token)
+   # print(implication_token)
    #print( nests_token)
-    print(f"Match: {match}")
+    #print(f"Match: {match}")
