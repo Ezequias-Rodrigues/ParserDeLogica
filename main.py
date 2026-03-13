@@ -48,7 +48,8 @@ def extract_all_parentheses(text):
 def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
     #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
     #   Desde já, peço seu perdão
-    if(not text in variable_lists): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
+    
+    if(not text in variable_lists and(result == None or not text in result)): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
         if(result == None):
             result = [text]
         else:
@@ -57,10 +58,10 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
         result = []
     if(r2l): matches = text.split(op,1)
     else: matches = text.rsplit(op,1)
-    if(text != matches[0] and not matches[0] in variable_lists): result.append(matches[0])
+   
+    if(text != matches[0] and not matches[0] in variable_lists and not matches[0] in result ): result.append(matches[0])
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op)[::-1]) #Desinverte pra inverter de novo na ultima iteração
-    print("Nexp",text, result)
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
 def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
@@ -94,7 +95,7 @@ def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão or
 def tokenize_exp(matches):
     global token_count
     last_var = None #Creio eu que o valor do token mais recente seja o mais aninhado, então ele deve ser o primeiro a ser substituído
-    last_var_literal = "BCC"
+    last_var_literal = "BCC" #Qualquer valor aqui não faz diferença
     for match in matches:
         token_value = hex(token_count)  
         if(last_var and match.find(last_var_literal) != -1):
@@ -110,17 +111,31 @@ def tokenize_exp(matches):
 
 text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
 #text_implication = "i>c+j>a.c.k>l"
-text_implication = "p.q>b>r.s"
+text_implication = "t.p+q>b>r.s+t"
 tokenize_var(text_implication)
  #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
 
 #exp = extract_op(tokenize_var(text_implication), ">") Por enquanto vou trocar essa pela expressão real por questões de legibilidade
-exp = extract_op(text_implication, ">") 
+exp = extract_op(text_implication, "=") 
+aux = exp[:]
+print(exp)
+for e in exp:
+    if(e.find("=") == -1):
+        aux.extend(extract_op(e, ">", True, exp))
+exp = aux[:]
+for e in exp:
+    if(e.find(">") == -1):
+        aux.extend(extract_op(e, "+", False, exp))
+exp = aux[:]
+for e in exp:
+    if(e.find("+") == -1):
+        aux.extend(extract_op(e, ".", False, exp))
+
 #exp1 = exp[:] #Copia de valores para não entrar num loop infinito
 #exp1 = list(map( lambda nexp: extract_op(nexp, ".", False, exp1), exp )) #Tokeniza as expressões de OR, da direita para a esquerda - usando um pouco de programação funcional
-print("Exp1", list(exp1), "\nEXP", exp)
+#print("Exp1", list(exp1), "\nEXP", exp)
 tokenize_exp(exp)
-
+print("Tokens:", tokens)
 #for match in all_matches:
    
 
