@@ -100,22 +100,36 @@ def tokenize_exp(matches):
     for match in matches:
         token_value = hex(token_count)
         c = 0
+        if(not match in last_var_literal): last_var_literal.append(match)
         for i in last_var:
-            
-            last_var_literal.append(match)
-            if(last_var and match.find(last_var_literal[c]) != -1):   
-                print(token_value,"b4", match , last_var_literal[c], var_to_tokens[i])
+            if(match != last_var_literal[c] and match.find(last_var_literal[c]) != -1):   
                 match = match.replace(last_var_literal[c], var_to_tokens[i])
-                print(token_value,"b5", match)
             c += 1
 
         tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
         var_to_tokens[match] = token_value  
-        last_var.append(match)
+        if(not match in last_var): last_var.append(match)
         if(len(last_var_literal) == 0):
             last_var_literal.append(match)
         token_count += 1  
-   # print(last_var, '\n', last_var_literal)
+    aux = last_var[:]
+    c = 0
+    new_exps = {}
+    for i in aux:
+        for j in aux:
+            if(i != j and j.find(i) != -1):
+                if(not j in new_exps): new_exps[j] = [i]
+                elif(len(var_to_tokens[i]) > len(new_exps[j])): new_exps[j].append(i)
+               
+                #last_var[c] = j.replace(i, var_to_tokens[i])
+        c += 1
+    for i in new_exps:
+        print(i)
+            
+       # new_exps[i] =  i.replace(new_exps[i], var_to_tokens[new_exps[i]])
+  #  last_var = list(new_exps.keys())
+    print("New exps: ", new_exps)
+
 def solve_tokens(rtokens):
     for token in rtokens:
         if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
@@ -124,10 +138,11 @@ def solve_tokens(rtokens):
 
 text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
 #text_implication = "i>c+j>a.c.k>l"
-text_implication = "t.p+q>b>r.s+t"
+text_implication = "t.p+q>b>r.s+t>i"
 
  #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
 tokenize_var(text_implication)
+
 #exp = extract_op(tokenize_var(text_implication), ">") Por enquanto vou trocar essa pela expressão real por questões de legibilidade
 exp = extract_op(text_implication, "=") 
 aux = exp[:]
@@ -147,7 +162,9 @@ for e in exp:
 #exp1 = exp[:] #Copia de valores para não entrar num loop infinito
 exp.sort(key = lambda x: len(x))
 tokenize_exp(exp)
-solve_tokens(tokens)
+
+#solve_tokens(tokens)
+
 #for match in all_matches:
    
 
