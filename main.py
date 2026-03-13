@@ -14,11 +14,8 @@ token_count = 0
 tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
 var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
 variable_lists = []
-nests_token = {} #nests_token[X] = [token1, token2, ...] onde X é representa o nivel de nesting que a expressão possui, e token1, token2, ... são os tokens que estão naquele nível de nesting.
-implication_token = {} #mesmo esquema mas com >
-or_token = {} 
-and_token = {} 
-
+variable_amount = 0
+table_rows = 0
 def extract_all_parentheses(text):
     
     #Não pretendo limitar a profundidade do nesting,
@@ -84,6 +81,8 @@ def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão or
     pattern = r'[aA-zZ]+'
     matches = regex.findall(pattern, text, regex.VERSION1)
     global token_count
+    global variable_amount
+    global table_rows
     for match in matches:
         if not match in variable_lists: #Evitar de tokenizar a mesma variável mais de uma vez
             token_value = hex(token_count)  
@@ -92,6 +91,8 @@ def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão or
             token_count += 1
             text = text.replace(match, token_value)
             variable_lists.append(match)
+    variable_amount = len(variable_lists)
+    table_rows = 2 ** variable_amount
     return text
 def tokenize_exp(matches):
     global token_count
@@ -99,13 +100,6 @@ def tokenize_exp(matches):
     last_var_literal = [] 
     for match in matches:
         token_value = hex(token_count)
-        c = 0
-        if(not match in last_var_literal): last_var_literal.append(match)
-        for i in last_var:
-          #  if(match != last_var_literal[c] and match.find(last_var_literal[c]) != -1):   
-             #   match = match.replace(last_var_literal[c], var_to_tokens[i])
-            c += 1
-
         tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
         var_to_tokens[match] = token_value  
         if(not match in last_var): last_var.append(match)
@@ -123,41 +117,35 @@ def tokenize_exp(matches):
                     for var in last_var:
                         if(var != token and token.find(var) != -1):
                             tokens[ltoken][0] = token.replace(var, var_to_tokens[var])
-    print(tokens)
-    #aux = last_var[:]
-   # c = 0
-   # new_exps = {}
-  #  for i in aux:
-      ##  for j in aux:
-          #  if(i != j and j.find(i) != -1):
-            #    if(not j in new_exps): new_exps[j] = [i]
-              #  elif(len(var_to_tokens[i]) > len(new_exps[j])): new_exps[j].append(i)
-               
-                #last_var[c] = j.replace(i, var_to_tokens[i])
-     #   c += 1
-   # for i in new_exps:
-  #     
-      #  for j in new_exps[i]:
-           # print(j, i, j in i  and j != i)
-       # new_exps[i] =  i.replace(new_exps[i], var_to_tokens[new_exps[i]])
-  #  last_var = list(new_exps.keys())
-   # print("New exps: ", new_exps)
-
 def solve_tokens(rtokens):
     for token in rtokens:
         if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
            print(token, rtokens[token])
     print(var_to_tokens)
-
+def create_truth_table():
+    table = None
+    for i in range(table_rows):
+        if(table == None):
+            table = [[False] * variable_amount]
+        else:
+            table.append([False] * variable_amount)
+        rowBinValue = bin(i)[2:].zfill(variable_amount) #Gera o valor binário da linha atual, preenchendo com zeros à esquerda para garantir que tenha o mesmo número de dígitos que o número de variáveis
+        
+        for j in range(variable_amount):
+            table[i][j] = rowBinValue[j] == '1'
+    return table
+def parse_truth_table(table):
+    for i in range(table_rows):
+        print(f"Row {i}: {table[i]}")
+        for j in range(variable_amount):
+            tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j] 
+        print(solve_exp(tokens[var_to_tokens[variable_lists[j]]][0]))
+        pass
+    print(tokens)
 text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
 #text_implication = "i>c+j>a.c.k>l"
 text_implication = "t.p+q>b>r.s+t>i"
-
- #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
-tokenize_var(text_implication)
-
-#exp = extract_op(tokenize_var(text_implication), ">") Por enquanto vou trocar essa pela expressão real por questões de legibilidade
-exp = extract_op(text_implication, "=") 
+exp = extract_op(tokenize_var(text_implication), "=") 
 aux = exp[:]
 
 for e in exp:
@@ -176,6 +164,8 @@ for e in exp:
 exp.sort(key = lambda x: len(x))
 tokenize_exp(exp)
 
+parse_truth_table(create_truth_table())
+#print(variable_lists, table_rows, variable_amount)
 #solve_tokens(tokens)
 
 #for match in all_matches:
