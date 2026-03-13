@@ -102,33 +102,46 @@ def tokenize_exp(matches):
         c = 0
         if(not match in last_var_literal): last_var_literal.append(match)
         for i in last_var:
-            if(match != last_var_literal[c] and match.find(last_var_literal[c]) != -1):   
-                match = match.replace(last_var_literal[c], var_to_tokens[i])
+          #  if(match != last_var_literal[c] and match.find(last_var_literal[c]) != -1):   
+             #   match = match.replace(last_var_literal[c], var_to_tokens[i])
             c += 1
 
         tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
         var_to_tokens[match] = token_value  
         if(not match in last_var): last_var.append(match)
-        if(len(last_var_literal) == 0):
-            last_var_literal.append(match)
         token_count += 1  
-    aux = last_var[:]
-    c = 0
-    new_exps = {}
-    for i in aux:
-        for j in aux:
-            if(i != j and j.find(i) != -1):
-                if(not j in new_exps): new_exps[j] = [i]
-                elif(len(var_to_tokens[i]) > len(new_exps[j])): new_exps[j].append(i)
+    print(last_var)
+    low_complexity = False
+    while (not low_complexity):
+        low_complexity = True
+        for ltoken in tokens:
+            token = tokens[ltoken][0]
+            if not token in variable_lists:
+                patterns = r'^[^+\.=>]*[+\.=>][^+\.=>]*$' #Checa se a expressão é de baixa complexidade, ou seja, se ela tem apenas um operador lógico
+                if(regex.match(patterns, token, regex.VERSION1) == None):
+                    low_complexity = False
+                    for var in last_var:
+                        if(var != token and token.find(var) != -1):
+                            tokens[ltoken][0] = token.replace(var, var_to_tokens[var])
+    print(tokens)
+    #aux = last_var[:]
+   # c = 0
+   # new_exps = {}
+  #  for i in aux:
+      ##  for j in aux:
+          #  if(i != j and j.find(i) != -1):
+            #    if(not j in new_exps): new_exps[j] = [i]
+              #  elif(len(var_to_tokens[i]) > len(new_exps[j])): new_exps[j].append(i)
                
                 #last_var[c] = j.replace(i, var_to_tokens[i])
-        c += 1
-    for i in new_exps:
-        print(i)
-            
+     #   c += 1
+   # for i in new_exps:
+  #     
+      #  for j in new_exps[i]:
+           # print(j, i, j in i  and j != i)
        # new_exps[i] =  i.replace(new_exps[i], var_to_tokens[new_exps[i]])
   #  last_var = list(new_exps.keys())
-    print("New exps: ", new_exps)
+   # print("New exps: ", new_exps)
 
 def solve_tokens(rtokens):
     for token in rtokens:
