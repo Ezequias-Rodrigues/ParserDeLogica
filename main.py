@@ -45,14 +45,22 @@ def extract_all_parentheses(text):
         result.extend(inner)
     return result
 #Fora os parenteses, vou implementar a tokenização das expressões da de menor precedencia para a de maior, pq no caso dos parenteses, isso já é implicitamente resolvido
-def extract_op(text, op):
+def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
     #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
     #   Desde já, peço seu perdão
-
-    result = [text]
-    matches = text.split(op,1)
+    if(not text in variable_lists): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
+        if(result == None):
+            result = [text]
+        else:
+            result.append(text)
+    else:
+        result = []
+    if(r2l): matches = text.split(op,1)
+    else: matches = text.rsplit(op,1)
+    if(text != matches[0] and not matches[0] in variable_lists): result.append(matches[0])
     if(len(matches) > 1):
-        result.extend(extract_op(matches[1], op))
+        result.extend(extract_op(matches[1], op)[::-1]) #Desinverte pra inverter de novo na ultima iteração
+    print("Nexp",text, result)
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
 def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
@@ -101,13 +109,17 @@ def tokenize_exp(matches):
         token_count += 1  
 
 text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
-text_implication = "i>c+j>a.c.k>l"
-all_matches = extract_op(text_implication, ">") 
+#text_implication = "i>c+j>a.c.k>l"
+text_implication = "p.q>b>r.s"
+tokenize_var(text_implication)
  #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
 
-exp = extract_op(tokenize_var(text_implication), ">")
+#exp = extract_op(tokenize_var(text_implication), ">") Por enquanto vou trocar essa pela expressão real por questões de legibilidade
+exp = extract_op(text_implication, ">") 
+#exp1 = exp[:] #Copia de valores para não entrar num loop infinito
+#exp1 = list(map( lambda nexp: extract_op(nexp, ".", False, exp1), exp )) #Tokeniza as expressões de OR, da direita para a esquerda - usando um pouco de programação funcional
+print("Exp1", list(exp1), "\nEXP", exp)
 tokenize_exp(exp)
-print(tokens)
 
 #for match in all_matches:
    
