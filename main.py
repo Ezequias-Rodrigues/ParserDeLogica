@@ -48,8 +48,8 @@ def extract_all_parentheses(text):
 def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
     #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
     #   Desde já, peço seu perdão
-    
-    if(not text in variable_lists and(result == None or not text in result)): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
+    exclude_keys = list(tokens.keys())
+    if(not text in variable_lists and not text in exclude_keys and(result == None or not text in result)): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
         if(result == None):
             result = [text]
         else:
@@ -59,7 +59,7 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     if(r2l): matches = text.split(op,1)
     else: matches = text.rsplit(op,1)
    
-    if(text != matches[0] and not matches[0] in variable_lists and not matches[0] in result ): result.append(matches[0])
+    if(text != matches[0] and not matches[0] in variable_lists and  not matches[0] in exclude_keys and not matches[0] in result ): result.append(matches[0])
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op)[::-1]) #Desinverte pra inverter de novo na ultima iteração
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
@@ -85,40 +85,53 @@ def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão or
     matches = regex.findall(pattern, text, regex.VERSION1)
     global token_count
     for match in matches:
-        token_value = hex(token_count)  
-        tokens[token_value] = [match, False]  
-        var_to_tokens[match] = token_value  #
-        token_count += 1
-        text = text.replace(match, token_value)
-        variable_lists.append(match)
+        if not match in variable_lists: #Evitar de tokenizar a mesma variável mais de uma vez
+            token_value = hex(token_count)  
+            tokens[token_value] = [match, False]  
+            var_to_tokens[match] = token_value  #
+            token_count += 1
+            text = text.replace(match, token_value)
+            variable_lists.append(match)
     return text
 def tokenize_exp(matches):
     global token_count
-    last_var = None #Creio eu que o valor do token mais recente seja o mais aninhado, então ele deve ser o primeiro a ser substituído
-    last_var_literal = "BCC" #Qualquer valor aqui não faz diferença
+    last_var = [] 
+    last_var_literal = [] 
     for match in matches:
-        token_value = hex(token_count)  
-        if(last_var and match.find(last_var_literal) != -1):
-            aux = last_var_literal
-            last_var_literal = match
-            match = match.replace(aux, var_to_tokens[last_var])
+        token_value = hex(token_count)
+        c = 0
+        for i in last_var:
+            
+            last_var_literal.append(match)
+            if(last_var and match.find(last_var_literal[c]) != -1):   
+                print(token_value,"b4", match , last_var_literal[c], var_to_tokens[i])
+                match = match.replace(last_var_literal[c], var_to_tokens[i])
+                print(token_value,"b5", match)
+            c += 1
+
         tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
         var_to_tokens[match] = token_value  
-        last_var = match
-        if(last_var_literal == "BCC"):
-            last_var_literal = match
+        last_var.append(match)
+        if(len(last_var_literal) == 0):
+            last_var_literal.append(match)
         token_count += 1  
+   # print(last_var, '\n', last_var_literal)
+def solve_tokens(rtokens):
+    for token in rtokens:
+        if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
+           print(token, rtokens[token])
+    print(var_to_tokens)
 
 text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
 #text_implication = "i>c+j>a.c.k>l"
 text_implication = "t.p+q>b>r.s+t"
-tokenize_var(text_implication)
- #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
 
+ #nests_token[match.count("(")] = match #No caso de expressões com parenteses, determinar o nível de nesting é simples, basta contar o número de parênteses de abertura.
+tokenize_var(text_implication)
 #exp = extract_op(tokenize_var(text_implication), ">") Por enquanto vou trocar essa pela expressão real por questões de legibilidade
 exp = extract_op(text_implication, "=") 
 aux = exp[:]
-print(exp)
+
 for e in exp:
     if(e.find("=") == -1):
         aux.extend(extract_op(e, ">", True, exp))
@@ -132,10 +145,9 @@ for e in exp:
         aux.extend(extract_op(e, ".", False, exp))
 
 #exp1 = exp[:] #Copia de valores para não entrar num loop infinito
-#exp1 = list(map( lambda nexp: extract_op(nexp, ".", False, exp1), exp )) #Tokeniza as expressões de OR, da direita para a esquerda - usando um pouco de programação funcional
-#print("Exp1", list(exp1), "\nEXP", exp)
+exp.sort(key = lambda x: len(x))
 tokenize_exp(exp)
-print("Tokens:", tokens)
+solve_tokens(tokens)
 #for match in all_matches:
    
 
