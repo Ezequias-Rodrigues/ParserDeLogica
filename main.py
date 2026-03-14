@@ -4,6 +4,7 @@ import regex
 '''
 Simbolos que pretendo usar:
 - `.` para AND
+- `#` para XOR (o ^ é usado pra regex, e como eu to implementando isso depois eu REALMENTE não quero mexer muito nas regex que já estão funcionando)
 - `+` para OR
 - `>` para IMPLICAÇÃO
 - `=` para BICONDICIONAL
@@ -18,7 +19,7 @@ var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspo
 variable_lists = []
 variable_amount = 0
 table_rows = 0
-op_pattern = r'([+\.=>])' #Operadores disponiveis
+op_pattern = r'([+\.=>#])' #Operadores disponiveis
 def extract_all_parentheses(text):
     
     #Não pretendo limitar a profundidade do nesting,
@@ -122,6 +123,8 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
             result = (not (A)) or (B)
         case "=":  
             result = (A == B)
+        case "#":
+            result = (A ^ B)
 
    # print("Matches ", matches)
    # print(expr, " A:", A, mult[0], "B:", B, mult[1], " OP:", op, " R:", result, " N:", exp_negated)       
@@ -163,7 +166,7 @@ def tokenize_exp(matches):
         for ltoken in tokens:
             token = tokens[ltoken][0]
             if not token in variable_lists:
-                patterns = r'[~]{0,1}^[^+\.=>]*[+\.=>][^+\.=>]*$' #Checa se a expressão é de baixa complexidade, ou seja, se ela tem apenas um operador lógico
+                patterns = r'[~]{0,1}^[^+\.=>#]*[+\.=>#][^+\.=>#]*$' #Checa se a expressão é de baixa complexidade, ou seja, se ela tem apenas um operador lógico
                 #Não usei a função pq eu havia esquecido dela KKKKKKK, se eu lembrar depois eu mudo #FIXME
                 if(regex.match(patterns, token, regex.VERSION1) == None):
                     for var in last_var:
@@ -279,9 +282,15 @@ def extract_exp(text): #A ordem de extração aqui é invertida, primeiro tira a
                 aux = (extract_op(e, "+", False, exp))
             exp = aux[:]
     else: exp = extract_op(text, "+", False, exp)
-    if(len(exp) > 0): 
+    if(len(exp) > 0): #Fiz uma breve pesquisa, e não ficou muito claro para mim qual a precedencia do XOR, então qualquer coisa eu mudo em aula, por enquanto ele está depois do AND e antes do OR
         for e in exp:
             if(e.find("+") == -1):
+                aux = (extract_op(e, "#", False, exp))
+            exp = aux[:]
+    else: exp = extract_op(text, "#", False, exp)
+    if(len(exp) > 0): 
+        for e in exp:
+            if(e.find("#") == -1):
                 aux = (extract_op(e, ".", False, exp))
             exp = aux[:]
     else: exp = extract_op(text, ".", False, exp)
@@ -291,7 +300,7 @@ def extract_exp(text): #A ordem de extração aqui é invertida, primeiro tira a
     return exp
 
 text = "abacate.banana+carambola>(~(abacate.carambola)+carambola)" #Variaveis infinitas, com infinitos caracteres (em teoria )
-
+#text = "a#b+c"
 tokenized = tokenize_var(text)
 parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
 
@@ -308,3 +317,4 @@ else:
     tokenize_exp(extract_exp(tokenize_parenthesis(exp_extracted, tokenized)))
 parse_truth_table(create_truth_table())
 
+#Amanhã eu faço isso aqui ficar usavel apartir da CLI sem precisar de ficar pondo expressões hardcoded no text
