@@ -48,8 +48,7 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
     #Desde já, peço seu perdão
     exclude_keys = list(tokens.keys())
-    exclude_keys.append('') #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
-    if(not text in variable_lists and not text in exclude_keys and(result == None or not text in result )): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
+    if(not text in variable_lists and not text in exclude_keys and(result == None or not text in result)): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
         if(result == None):
             
             result = [text]
@@ -62,18 +61,17 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     else: matches = text.rsplit(op,1)
     
     #print("OP", op , "Matches",matches,"Result", result,"Exclude", exclude_keys)
-
     isAlreadyStored = matches[0] in result 
     isExcluded =  matches[0] in exclude_keys 
     isSoleVariable = matches[0] in variable_lists 
-    if(text != matches[0] and not isSoleVariable and  not isExcluded and not isAlreadyStored): result.append(matches[0])
+    if(text != matches[0] and not isSoleVariable and  not isExcluded and not isAlreadyStored ): result.append(matches[0])
     
    # print("Match", matches[0], "Sole" ,isSoleVariable, "Excluded", isExcluded, "Stored", isAlreadyStored, "Result", result)
     
     if(len(matches) > 1 ):
         if( not is_expr_low_complexity(matches[1])):    
             result = extract_op(matches[1], op, r2l, result)[::-1] #Desinverte pra inverter de novo na ultima iteração
-        elif matches[1] != '':
+        else:
             result.append(matches[1])
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
 def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
@@ -81,16 +79,7 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     op_pattern = r'([+\.=>])'
     op = regex.search(op_pattern, expr, regex.VERSION1).group(0) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
-    matches = list(regex.findall(pattern, expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
-    #Aqui vou ter que criar um jeito para lidar com negações
-    mult = [True, True]
-    
-    if('~' in matches[0]):
-        matches[0] = matches[1].replace('~', '')
-        mult[0] = False
-    if('~' in matches[1]):
-        matches[1] = matches[1].replace('~', '')
-        mult[1] = False
+    matches = regex.findall(pattern, expr, regex.VERSION1)[0]
     A = tokens[matches[0]][0]
     B = tokens[matches[1]][0]
     if(A in variable_lists):
@@ -101,24 +90,15 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
         B = tokens[var_to_tokens[B]][1]
     else:
         B = solve_exp(B)
-
-    if(not mult[0]): A = not A
-    if(not mult[1]): B = not B
-
-   # print(expr)
-   # print(tokens)
+    
     match op:
         case ".":
-          #  print(A, ".", B, A and B)
-            return ((A) and (B))
+            return (A and B)
         case "+":  
-            #print(A,"+", B, A and B)
-            return ((A) or (B))
+            return (A or B)
         case ">":
-          #  print(A,">", B,  (not (A)) or (B))
-            return (not (A)) or (B)
+            return ((not A) or B)
         case "=":
-            
             return (A == B)
     assert("Error: Invalid operator")
     pass
@@ -160,6 +140,7 @@ def tokenize_exp(matches):
                     for var in last_var:
                         if(var != token and token.find(var) != -1):
                             low_complexity = False
+                            print(token)
                             tokens[ltoken][0] = token.replace(var, var_to_tokens[var])
 def solve_tokens(rtokens):
     for token in rtokens:
@@ -179,12 +160,12 @@ def create_truth_table():
     table = None
     for i in range(table_rows):
         if(table == None):
-            table = [[False] * variable_amount]
+            table = [[0] * variable_amount]
         else:
-            table.append([False] * variable_amount)
+            table.append([0] * variable_amount)
         rowBinValue = bin(i)[2:].zfill(variable_amount) #Gera o valor binário da linha atual, preenchendo com zeros à esquerda para garantir que tenha o mesmo número de dígitos que o número de variáveis
         for j in range(variable_amount):
-            table[i][j] = rowBinValue[j] == '1'
+            table[i][j] = rowBinValue[j] 
     return table[::-1] #Invertendo a orientação da tabela para seguir oq a gente viu em aula, apesar de não fazer diferença
 def parse_truth_table(table):
     for i in range(table_rows):
@@ -193,16 +174,18 @@ def parse_truth_table(table):
             
         solve_tokens(tokens)
         print(f"Linha {i+1}: {table[i]} = Resultado: {tokens[list(tokens.keys())[-1]][1]}")
-text = " ((a.b)+c).(a.~(b>c)+d)"
+text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
 #text_implication = "i>c+j>a.c.k>l"
 #text_implication = "t.p+q>b>r.s+t>i"
-text_implication = text
+text_implication = "a.b+c>b"
 exp = extract_op(tokenize_var(text_implication), "=") 
 aux = exp[:]
-for e in exp:
-    if(e.find("=") == -1):
-        aux = extract_op(e, ">", True, exp)
+elen = len(exp)
+for e in range(elen):
+    if(exp[e].find("=") == -1):
+        aux = extract_op(exp[e], ">", True, exp)
 exp = aux[:]
+print(len(exp))
 for e in exp:
     if(e.find(">") == -1):
         aux = (extract_op(e, "+", False, exp))
@@ -214,10 +197,9 @@ exp = aux[:]
 for e in exp:
     if(e.find(".") == -1):
         aux = (extract_op(e, "~", False, exp))
+#print(exp)
 
 exp.sort(key = lambda x: len(x))
-
 tokenize_exp(exp)
-
-parse_truth_table(create_truth_table())
 print(tokens)
+parse_truth_table(create_truth_table())
