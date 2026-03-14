@@ -54,6 +54,7 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     exclude_keys.append('') #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
     exclude_keys.append('(')
     exclude_keys.append(')')#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
+    
     if result == None:
         result = []
     if(r2l): matches = text.split(op,1)
@@ -213,7 +214,6 @@ def solve_tokens(rtokens):
     for token in rtokens:
         if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
             if(type(is_expr_low_complexity(rtokens[token][0])) == tuple):
-               print(is_expr_low_complexity(rtokens[token][0]), rtokens[token][0])
                rtokens[token][1] =  solve_exp(rtokens[token][0])
     
 def get_op(exp):
@@ -264,38 +264,30 @@ def parse_truth_table(table):
 def extract_exp(text):
     exp = extract_op(text, "=") 
     aux = exp[:]
-  
     if(len(exp) > 0): 
-        exp = aux[:]
         for e in exp:
             if(e.find("=") == -1):
                 aux = extract_op(e, ">", True, exp)
-    else: 
-        exp = extract_op(text, ">", True) 
-        exp = aux[:]
+            exp = aux[:]
+    else: exp = extract_op(text, ">", True, exp) 
     if(len(exp) > 0): 
-        exp = aux[:]
         for e in exp:
             if(e.find(">") == -1):
                 aux = (extract_op(e, "+", False, exp))
-    else: 
-        exp = extract_op(text, "+", False)
-        exp = aux[:]
+            exp = aux[:]
+    else: exp = extract_op(text, "+", False, exp)
     if(len(exp) > 0): 
-        print("tinha +")
-        exp = aux[:]
         for e in exp:
             if(e.find("+") == -1):
                 aux = (extract_op(e, ".", False, exp))
-    else: 
-        exp = extract_op(text, ".", False)
-        exp = aux[:]
+            exp = aux[:]
+    else: exp = extract_op(text, ".", False, exp)
     
     exp.append(text)
     exp.sort(key = lambda x: len(x))
     return exp
 
-text = "a.b+c>~a.c"
+text = "a.b+c>(~(a.c)+c)"
 
 tokenized = tokenize_var(text)
 parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
