@@ -60,15 +60,15 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     if(r2l): matches = text.split(op,1)
     else: matches = text.rsplit(op,1)
     #print("OP", op , "Matches",matches,"Result", result,"Exclude", exclude_keys)
-    isAlreadyStored = matches[0] in result 
-    isExcluded =  matches[0] in exclude_keys 
-    unbalancedMatch = matches[0].count("(") != matches[0].count(")")
+    isAlreadyStored = matches[0] in result #Evita duplicadas
+    isExcluded =  matches[0] in exclude_keys  #Evita caracteres nulos e outros "artefatos" no código
+    unbalancedMatch = matches[0].count("(") != matches[0].count(")") #Olha, não era pra chegar parenteses aberto aqui, PORÉM...
     if(text != matches[0]  and  not isExcluded and not isAlreadyStored and not unbalancedMatch): result.append(matches[0])
    # print("Match", matches[0], "Sole" ,isSoleVariable, "Excluded", isExcluded, "Stored", isAlreadyStored, "Result", result)
     if(len(matches) > 1 ):
         unbalancedMatch = matches[1].count("(") != matches[1].count(")")
         if( not is_expr_low_complexity(matches[1])):    
-            result = extract_op(matches[1], op, r2l, result)[::-1] #Desinverte pra inverter de novo na ultima iteração
+            result = extract_op(matches[1], op, r2l, result)[::-1] #Desinverte pra inverter de novo na ultima iteração (papo de maluco, eu tlg)
         elif matches[1] != '' and not unbalancedMatch:
             result.append(matches[1])
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
@@ -91,7 +91,7 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     mult = [True, True]
     
     if('~' in matches[0]):
-        matches[0] = matches[0].replace('~', '')
+        matches[0] = matches[0].replace('~', '') #Aqui eu registro que foi negado o valor, mais tiro o operador de negação pra evitar a fadiga
         mult[0] = False
     if('~' in matches[1]):
         matches[1] = matches[1].replace('~', '')
@@ -130,7 +130,7 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     return result
 
 def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
-    pattern = r'[aA-zZ]+'
+    pattern = r'[aA-zZ]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
     matches = regex.findall(pattern, text, regex.VERSION1)
 
     global token_count
@@ -205,7 +205,8 @@ def tokenize_parenthesis(matches, text):
     tokens = tokens | token_aux #Eu tive que pesquisar pra achar essa função... esse operador usualmente é pra operação bitwise em outras linguagens (inclusive em GDScript, que é baseado em Python)
     
     var_to_tokens = var_to_tokens | var_aux
-    for token in list(var_aux.keys())[::-1]:
+    for token in list(var_aux.keys())[::-1]: #inverte a var para os MAIS COMPLEXOS ficarem na frente dessa vez, isso é pq o texto vai ser substituido, e ao invés de comparar cada valor com cada outro,
+        #eu só altero ele no texto original, e vou dando replace simplificando ela
         if(token in text):
             text  = text.replace(token, var_aux[token])
     return text
@@ -225,7 +226,6 @@ def get_op(exp):
 
 def is_expr_low_complexity(expr):
     op = get_op(expr)
-   
     if(op == None): return False
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     if(regex.match(pattern, expr, regex.VERSION1) == None): return False    
@@ -258,19 +258,22 @@ def parse_truth_table(table):
         for j in range(variable_amount):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
         solve_tokens(tokens)
-        #print("Tokens: ",tokens)
+        #print("Tokens:" , tokens)
         print(f"Linha {i+1}: {table[i]} = Resultado: {tokens[list(tokens.keys())[-1]][1]}")
 
-def extract_exp(text):
-    exp = extract_op(text, "=") 
-    aux = exp[:]
-    if(len(exp) > 0): 
+def extract_exp(text): #A ordem de extração aqui é invertida, primeiro tira a bicondicional, depois implicação etc, o motivo é pq temos que quebrar do mais complexo pro menos complexo
+   
+    exp = extract_op(text, "=")#A bi condicional é mais complexa, pois por ser a ultima, é a que pode ter mais expressões nested nela.
+    aux = exp[:]#Sempre q vc ver essa linha, significa q uma copia dos valores de exp foi feita para aux, isso pq o tamanho de exp vai ser alterado conforme as expressões são extraidas
+    #Não da pra fazer aux = exp pq dessa forma vc diz q aux é uma referencia de exp, e toda vez que você modificar um dos dois, vc modifica o outro. No caso desse código, isso causaria um loop infinito
+    
+    if(len(exp) > 0): #Caso tenha sido extraido expressões da bicondicional, da para usar as expressões nested nela para dar continuidade, e tentar extrair a implicação
         for e in exp:
             if(e.find("=") == -1):
                 aux = extract_op(e, ">", True, exp)
             exp = aux[:]
-    else: exp = extract_op(text, ">", True, exp) 
-    if(len(exp) > 0): 
+    else: exp = extract_op(text, ">", True, exp) #Porem, toda via, entretanto, caso não haja uma bicondicional, tenta extrair as expressões nested na implicação apartir do texto inicial
+    if(len(exp) > 0): #E assim vai
         for e in exp:
             if(e.find(">") == -1):
                 aux = (extract_op(e, "+", False, exp))
@@ -283,26 +286,25 @@ def extract_exp(text):
             exp = aux[:]
     else: exp = extract_op(text, ".", False, exp)
     
-    exp.append(text)
-    exp.sort(key = lambda x: len(x))
+    exp.append(text)#Ao final de tudo, adiciona a expressão original(bem, quase original, ela já está tokenizada) na lista de expressões
+    exp.sort(key = lambda x: len(x)) #Organiza a lista de expressões do menos complexos(no caso desse algoritmo em especifico, complexidade =  tamanho da string) para o mais complexo
     return exp
 
-text = "a.b+c>(~(a.c)+c)"
+text = "abacate.banana+carambola>(~(abacate.carambola)+carambola)" #Variaveis infinitas, com infinitos caracteres (em teoria )
 
 tokenized = tokenize_var(text)
 parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
-print(parenthesis_step)
+
 if(parenthesis_step == []): #Sem parentheses na equação, então evita tentar tokenizar parenteses pra compensar pelas má otimizações que fiz KKKK
     exp_extracted = extract_exp(tokenized)
-    print(exp_extracted)
-    tokenize_exp(exp_extracted)
+    tokenize_exp(exp_extracted) #Tokeniza linearmente
 else:
     exp_extracted = []
-    for exp in parenthesis_step:
+    for exp in parenthesis_step: #Aqui a tokenização precisa se aprofundar, então tokeniza os parenteses mais internos primeiro, e depois os mais externos, a ordem deles ja foi definida em extract_all_parentheses
         if(is_parenthesis_low_complexity(exp) or not get_op(exp)):
             exp_extracted.append(exp)
         else:
             exp_extracted.extend(extract_exp(exp))
     tokenize_exp(extract_exp(tokenize_parenthesis(exp_extracted, tokenized)))
 parse_truth_table(create_truth_table())
-print(tokens)
+
