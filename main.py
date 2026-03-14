@@ -42,7 +42,9 @@ def extract_all_parentheses(text):
         result.append(match)
         inner = extract_all_parentheses(match[1:-1]) # Remove os parênteses externos antes de chamar recursivamente
         result.extend(inner)
+    result.sort(key = lambda x: len(x)) #Mais complexas devem ficar por ultimo
     return result
+
 #Fora os parenteses, vou implementar a tokenização das expressões da de menor precedencia para a de maior, pq no caso dos parenteses, isso já é implicitamente resolvido
 def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
     #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
@@ -51,31 +53,26 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     exclude_keys.append('') #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
     if(not text in variable_lists and not text in exclude_keys and(result == None or not text in result )): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
         if(result == None):
-            
             result = [text]
         else:
-           
             result.append(text)
     elif result == None:
         result = []
     if(r2l): matches = text.split(op,1)
     else: matches = text.rsplit(op,1)
-    
     #print("OP", op , "Matches",matches,"Result", result,"Exclude", exclude_keys)
-
     isAlreadyStored = matches[0] in result 
     isExcluded =  matches[0] in exclude_keys 
     isSoleVariable = matches[0] in variable_lists 
     if(text != matches[0] and not isSoleVariable and  not isExcluded and not isAlreadyStored): result.append(matches[0])
-    
    # print("Match", matches[0], "Sole" ,isSoleVariable, "Excluded", isExcluded, "Stored", isAlreadyStored, "Result", result)
-    
     if(len(matches) > 1 ):
         if( not is_expr_low_complexity(matches[1])):    
             result = extract_op(matches[1], op, r2l, result)[::-1] #Desinverte pra inverter de novo na ultima iteração
         elif matches[1] != '':
             result.append(matches[1])
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
+
 def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
     if(type(expr) is bool): return expr
     op_pattern = r'([+\.=>])'
@@ -84,7 +81,6 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     matches = list(regex.findall(pattern, expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
     #Aqui vou ter que criar um jeito para lidar com negações
     mult = [True, True]
-    
     if('~' in matches[0]):
         matches[0] = matches[1].replace('~', '')
         mult[0] = False
@@ -101,12 +97,8 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
         B = tokens[var_to_tokens[B]][1]
     else:
         B = solve_exp(B)
-
     if(not mult[0]): A = not A
     if(not mult[1]): B = not B
-
-   # print(expr)
-   # print(tokens)
     match op:
         case ".":
           #  print(A, ".", B, A and B)
@@ -117,8 +109,7 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
         case ">":
           #  print(A,">", B,  (not (A)) or (B))
             return (not (A)) or (B)
-        case "=":
-            
+        case "=":  
             return (A == B)
     assert("Error: Invalid operator")
     pass
@@ -138,7 +129,6 @@ def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão or
             variable_lists.append(match)
     variable_amount = len(variable_lists)
     table_rows = 2 ** variable_amount
-   
     return text
 def tokenize_exp(matches):
     global token_count
@@ -156,25 +146,65 @@ def tokenize_exp(matches):
             token = tokens[ltoken][0]
             if not token in variable_lists:
                 patterns = r'[~]{0,1}^[^+\.=>]*[+\.=>][^+\.=>]*$' #Checa se a expressão é de baixa complexidade, ou seja, se ela tem apenas um operador lógico
+                #Não usei a função pq ela precisa de um operador e essa regex deduz automaticamente....  e eu também havia esquecido dela KKKKKKK
                 if(regex.match(patterns, token, regex.VERSION1) == None):
                     for var in last_var:
                         if(var != token and token.find(var) != -1):
                             low_complexity = False
                             tokens[ltoken][0] = token.replace(var, var_to_tokens[var])
+def tokenize_parenthesis(matches):
+    #Aqui vou ter que fazer diferente da função acima, lá eu usei o tokens direto, aqui eu vou ter que criar uma variavel auxiliar
+    #reduzir a complexidade das expressões nele, e depois inserir ela na tokens
+    token_aux = {}
+    var_aux = {}
+    global token_count
+    last_var = [] 
+    for match in matches:
+        token_value = hex(token_count)
+        token_aux[token_value] = [match, False]  
+        var_aux[match] = token_value  
+        token_count += 1 #Vou incrementar o token aqui mesmo para facilitar as coisas
+        if(not match in last_var): last_var.append(match)
+
+    low_complexity = False
+    while (not low_complexity):
+        low_complexity = True 
+        for ltoken in token_aux: 
+            token = token_aux[ltoken][0]
+            comp = is_parenthesis_low_complexity(token) #Aqui eu lembrei
+            if(not comp or type(comp) == tuple):
+                for var in last_var:
+                    if(var != token and token.find(var) != -1):
+                        low_complexity = False
+                        token_aux[ltoken][0] = token.replace(var, var_aux[var])
+                        print(var, token)
+    print(token_aux)
+    pass
 def solve_tokens(rtokens):
     for token in rtokens:
         if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
             if(type(is_expr_low_complexity(rtokens[token][0])) == tuple):
                rtokens[token][1] =  solve_exp(rtokens[token][0])
-def is_expr_low_complexity(expr):
+def get_op(exp):
     op_pattern = r'([+\.=>])'
-    op = regex.search(op_pattern, expr, regex.VERSION1) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
-    if(op == None): return True #Sem operadores
+    op = regex.search(op_pattern, exp, regex.VERSION1) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
+    if(op == None): return None #Sem operadores
     else: op = op.group(0)
+    return op
+def is_expr_low_complexity(expr):
+    op = get_op(expr)
+    if(op == None): return False
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     matches = regex.findall(pattern, expr, regex.VERSION1)[0]
     if(regex.match(pattern, expr, regex.VERSION1) == None): return False
     else: return matches
+
+def is_parenthesis_low_complexity(expr):
+    pattern = r'(\([^()]+[.+=>][^()]+\))([.+=>]([^.]+)){0,1}'
+    matches = regex.findall(pattern, expr, regex.VERSION1)
+    if(regex.match(pattern, expr, regex.VERSION1) == None): return False
+    else: return matches[0]
+
 def create_truth_table():
     table = None
     for i in range(table_rows):
@@ -190,34 +220,35 @@ def parse_truth_table(table):
     for i in range(table_rows):
         for j in range(variable_amount):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
-            
         solve_tokens(tokens)
         print(f"Linha {i+1}: {table[i]} = Resultado: {tokens[list(tokens.keys())[-1]][1]}")
+def extract_exp(text):
+    exp = extract_op(tokenize_var(text), "=") 
+    aux = exp[:]
+    for e in exp:
+        if(e.find("=") == -1):
+            aux = extract_op(e, ">", True, exp)
+    exp = aux[:]
+    for e in exp:
+        if(e.find(">") == -1):
+            aux = (extract_op(e, "+", False, exp))
+    exp = aux[:]
+    for e in exp:
+        if(e.find("+") == -1):
+            aux = (extract_op(e, ".", False, exp))
+    exp = aux[:]
+    for e in exp:
+        if(e.find(".") == -1):
+            aux = (extract_op(e, "~", False, exp))
+    exp.sort(key = lambda x: len(x))
+    return exp
 text = " ((a.b)+c).(a.~(b>c)+d)"
-#text_implication = "i>c+j>a.c.k>l"
-#text_implication = "t.p+q>b>r.s+t>i"
-text_implication = text
-exp = extract_op(tokenize_var(text_implication), "=") 
-aux = exp[:]
-for e in exp:
-    if(e.find("=") == -1):
-        aux = extract_op(e, ">", True, exp)
-exp = aux[:]
-for e in exp:
-    if(e.find(">") == -1):
-        aux = (extract_op(e, "+", False, exp))
-exp = aux[:]
-for e in exp:
-    if(e.find("+") == -1):
-        aux = (extract_op(e, ".", False, exp))
-exp = aux[:]
-for e in exp:
-    if(e.find(".") == -1):
-        aux = (extract_op(e, "~", False, exp))
 
-exp.sort(key = lambda x: len(x))
+text_implication = "a.b+c>c"
 
-tokenize_exp(exp)
+tokenize_parenthesis(extract_all_parentheses(text))
 
-parse_truth_table(create_truth_table())
+#tokenize_exp(extract_exp(text_implication))
+
+#parse_truth_table(create_truth_table())
 print(tokens)
