@@ -54,13 +54,7 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     exclude_keys.append('') #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
     exclude_keys.append('(')
     exclude_keys.append(')')#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
-    unbalancedText = text.count("(") != text.count(")")
-    if(not get_op(text) == None and not text in exclude_keys and(result == None or not text in result and not unbalancedText )): #Essas checagens contra a variable_list é para evitar que uma proposição sem operador seja colocado nessa lista
-        if(result == None):
-            result = [text]
-        else:
-            result.append(text)
-    elif result == None:
+    if result == None:
         result = []
     if(r2l): matches = text.split(op,1)
     else: matches = text.rsplit(op,1)
@@ -129,7 +123,7 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
             result = (A == B)
 
    # print("Matches ", matches)
-  #  print(expr, " A:", A, mult[0], "B:", B, mult[1], " OP:", op, " R:", result, " N:", exp_negated)       
+   # print(expr, " A:", A, mult[0], "B:", B, mult[1], " OP:", op, " R:", result, " N:", exp_negated)       
     
     if(exp_negated): result = not result
     return result
@@ -214,19 +208,14 @@ def tokenize_parenthesis(matches, text):
         if(token in text):
             text  = text.replace(token, var_aux[token])
     return text
-   # solve_parenthesis(var_aux)
-   # print(var_aux)
+
 def solve_tokens(rtokens):
     for token in rtokens:
         if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
             if(type(is_expr_low_complexity(rtokens[token][0])) == tuple):
+               print(is_expr_low_complexity(rtokens[token][0]), rtokens[token][0])
                rtokens[token][1] =  solve_exp(rtokens[token][0])
     
-def solve_parenthesis(ptokens):
-    for token in ptokens:
-        if(is_parenthesis_low_complexity(token)):
-            ptokens[token] = solve_exp(token) #Como ja passou pelo check de complexidade, da para remover os parenteses, é uma expressão unica
-
 def get_op(exp):
     global op_pattern
     op = regex.search(op_pattern, exp, regex.VERSION1) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
@@ -274,39 +263,48 @@ def parse_truth_table(table):
 
 def extract_exp(text):
     exp = extract_op(text, "=") 
- 
     aux = exp[:]
-    for e in exp:
-        if(e.find("=") == -1):
-            aux = extract_op(e, ">", True, exp)
-
-    exp = aux[:]
-    for e in exp:
-        if(e.find(">") == -1):
-            aux = (extract_op(e, "+", False, exp))
-
-    exp = aux[:]
-    for e in exp:
-        if(e.find("+") == -1):
-            aux = (extract_op(e, ".", False, exp))
-
+  
+    if(len(exp) > 0): 
+        exp = aux[:]
+        for e in exp:
+            if(e.find("=") == -1):
+                aux = extract_op(e, ">", True, exp)
+    else: 
+        exp = extract_op(text, ">", True) 
+        exp = aux[:]
+    if(len(exp) > 0): 
+        exp = aux[:]
+        for e in exp:
+            if(e.find(">") == -1):
+                aux = (extract_op(e, "+", False, exp))
+    else: 
+        exp = extract_op(text, "+", False)
+        exp = aux[:]
+    if(len(exp) > 0): 
+        print("tinha +")
+        exp = aux[:]
+        for e in exp:
+            if(e.find("+") == -1):
+                aux = (extract_op(e, ".", False, exp))
+    else: 
+        exp = extract_op(text, ".", False)
+        exp = aux[:]
+    
+    exp.append(text)
     exp.sort(key = lambda x: len(x))
     return exp
 
-text = "a.(b+c)=(~a.c)"
+text = "a.b+c>~a.c"
 
 tokenized = tokenize_var(text)
-#enclosed_pattern = r'^\(.*\)$'
-#while(regex.match(enclosed_pattern, tokenized, regex.VERSION1)): #Evitar casos tip ((((((((a.b))))))))
- #   tokenized = tokenized[1:-1] #Remove o primeiro e o ultimo caractere, que devem ser parenteses
-
 parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
 print(parenthesis_step)
 if(parenthesis_step == []): #Sem parentheses na equação, então evita tentar tokenizar parenteses pra compensar pelas má otimizações que fiz KKKK
     exp_extracted = extract_exp(tokenized)
+    print(exp_extracted)
     tokenize_exp(exp_extracted)
 else:
-    print(parenthesis_step)
     exp_extracted = []
     for exp in parenthesis_step:
         if(is_parenthesis_low_complexity(exp) or not get_op(exp)):
@@ -314,5 +312,5 @@ else:
         else:
             exp_extracted.extend(extract_exp(exp))
     tokenize_exp(extract_exp(tokenize_parenthesis(exp_extracted, tokenized)))
-print(tokens)
 parse_truth_table(create_truth_table())
+print(tokens)
