@@ -77,11 +77,16 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     if(type(expr) is bool): return expr
     expr = expr.replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
     op_pattern = r'([+\.=>])'
-    op = regex.search(op_pattern, expr, regex.VERSION1).group(0) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
+    op = regex.search(op_pattern, expr, regex.VERSION1)
+    print(expr)
+    if(op == None): #Sem operador = resolvido
+        return tokens[expr][1]
+    op = op .group(0) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     matches = list(regex.findall(pattern, expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
     #Aqui vou ter que criar um jeito para lidar com negações
     mult = [True, True]
+    
     if('~' in matches[0]):
         matches[0] = matches[1].replace('~', '')
         mult[0] = False
@@ -178,7 +183,9 @@ def tokenize_parenthesis(matches):
         low_complexity = True 
         for ltoken in token_aux: 
             token = token_aux[ltoken][0]
+            print("t",token)
             comp = is_parenthesis_low_complexity(token)
+            print("c",comp)
             if(not comp or type(comp) == tuple):
                 for var in last_var:
                     if(var != token and token.find(var) != -1):
@@ -243,6 +250,7 @@ def parse_truth_table(table):
         for j in range(variable_amount):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
         #solve_parenthesis(tokens)
+        print(tokens)
         solve_tokens(tokens)
         print(f"Linha {i+1}: {table[i]} = Resultado: {tokens[list(tokens.keys())[-1]][1]}")
 def extract_exp(text):
@@ -265,13 +273,13 @@ def extract_exp(text):
             aux = (extract_op(e, "~", False, exp))
     exp.sort(key = lambda x: len(x))
     return exp
-text = "a+b.c>d"
-
-
-#print(tokenize_parenthesis(extract_all_parentheses(tokenize_var(text))))
-
-tokenize_exp(extract_exp(tokenize_var(text)))
-
+text = "a.(c+b)>a"
+tokenized = tokenize_var(text)
+exp_extracted = extract_exp(tokenized)
+parenthesis_step = extract_all_parentheses(tokenized)
+if(parenthesis_step == []): #Sem parenthesis na equação, então evita tentar tokenizar parenteses pra compensar pelas má otimizações que fiz KKKK
+    tokenize_exp(exp_extracted)
+else:
+    print(parenthesis_step)
+    tokenize_parenthesis(exp_extracted)
 parse_truth_table(create_truth_table())
-print(variable_lists)
-print(tokens)
