@@ -1,3 +1,5 @@
+from ast import expr
+
 import regex
 '''
 Simbolos que pretendo usar:
@@ -60,22 +62,51 @@ def extract_op(text, op, r2l = True , result = None): #r2l = right to left, ou s
     if(len(matches) > 1):
         result.extend(extract_op(matches[1], op)[::-1]) #Desinverte pra inverter de novo na ultima iteração
     return result[::-1]#Invertendo a lista para poder tokenizar do menor para o maior 
-def solve_exp(expr, op): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
+def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
+    if(type(expr) is bool): return expr
+   
+    
+    op_pattern = r'([+\.=>])'
+    
+    op = regex.search(op_pattern, expr, regex.VERSION1).group(0) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     matches = regex.findall(pattern, expr, regex.VERSION1)[0]
-    #mockando valores booleanos para testar a função, depois eu substituo pelos tokens
-    mtokens = {matches[0]: False, matches[1]: False}
-
+    A = tokens[matches[0]][0]
+    B = tokens[matches[1]][0]
+   
+    if(A in variable_lists):
+        A = tokens[var_to_tokens[A]][1]
+    else:
+        A = solve_exp(A)
+    if(B in variable_lists):
+        B = tokens[var_to_tokens[B]][1]
+    else:
+        B = solve_exp(B)
+  #  print("expr", expr, "A", A, "B", B)
+    #while(not A in variable_lists):
+        
+       # A = solve_exp(A)
+    
+       # A = var_to_tokens[A]
+   # while(not B in variable_lists):
+       
+     #   B = solve_exp(B)
+        
+      #  B = var_to_tokens[B]
+   # print("A", A in tokens,"B", B in tokens)
+   # print("A", tokens[var_to_tokens[A]],"B", tokens[var_to_tokens[B]])
+   
+ 
     match op:
         case ".":
-            return mtokens[matches[0]] and mtokens[matches[1]]
+            return (A and B)
         case "+":  
-            return mtokens[matches[0]] or mtokens[matches[1]]
+            return (A or B)
         case ">":
-            return not mtokens[matches[0]] or mtokens[matches[1]]
+            return ((not A) or B)
         case "=":
-            return mtokens[matches[0]] == mtokens[matches[1]]
-
+            return (A == B)
+    assert("Error: Invalid operator")
     pass
 def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
     pattern = r'[aA-zZ]+'
@@ -97,14 +128,12 @@ def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão or
 def tokenize_exp(matches):
     global token_count
     last_var = [] 
-    last_var_literal = [] 
     for match in matches:
         token_value = hex(token_count)
         tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
         var_to_tokens[match] = token_value  
         if(not match in last_var): last_var.append(match)
         token_count += 1  
-    print(last_var)
     low_complexity = False
     while (not low_complexity):
         low_complexity = True
@@ -120,8 +149,19 @@ def tokenize_exp(matches):
 def solve_tokens(rtokens):
     for token in rtokens:
         if not rtokens[token][0] in variable_lists: #Se o token não for uma variável, ou seja, se for uma expressão, ele deve ser resolvido
-           print(token, rtokens[token])
-    print(var_to_tokens)
+           #print(token, rtokens[token])
+           if(is_expr_low_complexity(rtokens[token][0])):
+               rtokens[token][1] =  solve_exp(rtokens[token][0])
+             #  print("t",tokens)
+def is_expr_low_complexity(expr):
+    op_pattern = r'([+\.=>])'
+    
+    op = regex.search(op_pattern, expr, regex.VERSION1).group(0) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
+    pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
+    matches = regex.findall(pattern, expr, regex.VERSION1)[0]
+    if(regex.match(pattern, expr, regex.VERSION1) == None): return False
+    else: return matches
+
 def create_truth_table():
     table = None
     for i in range(table_rows):
@@ -130,21 +170,21 @@ def create_truth_table():
         else:
             table.append([False] * variable_amount)
         rowBinValue = bin(i)[2:].zfill(variable_amount) #Gera o valor binário da linha atual, preenchendo com zeros à esquerda para garantir que tenha o mesmo número de dígitos que o número de variáveis
-        
         for j in range(variable_amount):
             table[i][j] = rowBinValue[j] == '1'
     return table
 def parse_truth_table(table):
     for i in range(table_rows):
-        print(f"Row {i}: {table[i]}")
+       
         for j in range(variable_amount):
-            tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j] 
-        print(solve_exp(tokens[var_to_tokens[variable_lists[j]]][0]))
-        pass
-    print(tokens)
+            tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]    
+        solve_tokens(tokens)
+        print(f"Row {i}: {table[i]}, Resultado: {tokens[list(tokens.keys())[-1]][1]}")
+    #print("Solved: ", solve_exp(tokens[list(tokens.keys())[-1]][0]))  #Em teoria, se meu raciocionio estiver certo, o token mais externo(o ultimo), é a expressão completa resumida em A op B
 text = " ((a.b)+c).(a.~(b>c)+d)>((~a+(b.(c+d))>e)>f)+x.y>z+i>j>k"
 #text_implication = "i>c+j>a.c.k>l"
-text_implication = "t.p+q>b>r.s+t>i"
+#text_implication = "t.p+q>b>r.s+t>i"
+text_implication = "a.b=c"
 exp = extract_op(tokenize_var(text_implication), "=") 
 aux = exp[:]
 
@@ -165,6 +205,8 @@ exp.sort(key = lambda x: len(x))
 tokenize_exp(exp)
 
 parse_truth_table(create_truth_table())
+print(var_to_tokens)
+print(tokens)
 #print(variable_lists, table_rows, variable_amount)
 #solve_tokens(tokens)
 
