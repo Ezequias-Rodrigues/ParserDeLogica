@@ -238,7 +238,7 @@ def parse_truth_table(table):
     for i in range(table_rows):
         for j in range(variable_amount):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
-        print(f"Tokens linha {i+1}:", tokens)
+
         print(f"Linha {i+1}: {table[i]} = Resultado: {solve_exp(tokens[list(tokens.keys())[-1]][0])}")
 
 def tokenize_linear_exp(exp):
