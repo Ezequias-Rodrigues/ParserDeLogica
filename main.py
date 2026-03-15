@@ -257,6 +257,7 @@ def tokenize_linear_exp(exp):
 def linearize_parenthesis(extracted, matches):
     global token_count
     extracted.sort(key = lambda x: len(x))
+    if(extracted == []): return matches #O que não tem remédio, remediado está
     outer = extracted[-1] #Guarda o valor do ultimo index, que deve ser o mais complexo depois do sort
     final_exp = "" #Essa vai ser a expressão final depois de convertida
     
@@ -317,8 +318,8 @@ def main():
     #text = "(((a.b)>(c+a))=((b>c).(a+c)))+(a.(b>c))"
     inp = ""
     while(1):
-        clear()
-        try:
+            clear()
+        #try:
             print(
                 "\nSimbolos disponíveis:\n"\
                 "- `.` para AND\n"\
@@ -335,9 +336,9 @@ def main():
             if(inp == "exit" or inp == ""):
                 return
             solve(inp)
-        except:
-            print("Verifique sua equação, não foi possível interpretar ela (", inp, ")")
-            input("\nPressione ENTER para continuar...\n")
+        #except:
+          #  print("Verifique sua equação, não foi possível interpretar ela (", inp, ")")
+            #input("\nPressione ENTER para continuar...\n")
 
 if __name__ == "__main__":
     main()
