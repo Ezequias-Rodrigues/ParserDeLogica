@@ -213,13 +213,6 @@ def is_expr_low_complexity(expr):
             return False
     return matches
 
-def is_parenthesis_low_complexity(expr):
-    pattern = r'^\(.*\)$' #Pega qualquer coisa dentro de parenteses
-    if(expr.count("(") > 1): return False #Nested é complexo
-    if(regex.match(pattern, expr, regex.VERSION1) == None): return False
-    expr = expr.replace("(", "").replace(")", "")
-    return is_expr_low_complexity(expr)
-
 def create_truth_table():
     table = None
     for i in range(table_rows):
