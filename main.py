@@ -148,21 +148,25 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     
     if(exp_negated): result = not result
     return result
-
+def add_token(match):
+    if(match in var_to_tokens): return var_to_tokens[match]
+    global token_count
+    global variable_amount
+    token_value = hex(token_count)  
+    tokens[token_value] = [match, False]  
+    var_to_tokens[match] = token_value  
+    token_count += 1
+    return token_value
 def tokenize_var(text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
     pattern = r'[aA-zZ]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
     matches = regex.findall(pattern, text, regex.VERSION1)
 
-    global token_count
     global variable_amount
     global table_rows
     for match in matches:
         if not match in variable_lists: #Evitar de tokenizar a mesma variável mais de uma vez
-            token_value = hex(token_count)  
-            tokens[token_value] = [match, False]  
-            var_to_tokens[match] = token_value  #
-            token_count += 1
-            text = text.replace(match, token_value)
+            
+            text = text.replace(match, add_token(match))
             variable_lists.append(match)
     variable_amount = len(variable_lists)
     table_rows = 2 ** variable_amount
@@ -172,9 +176,7 @@ def tokenize_exp(matches):
     global token_count
     last_var = [] 
     for match in matches:
-        token_value = hex(token_count)
-        tokens[token_value] = [match, False]  # Armazenar o valor original e o valor booleano (inicialmente False, mas não faz diferença nesse momento)
-        var_to_tokens[match] = token_value  
+        add_token(match)
         if(not match in last_var): last_var.append(match)
         token_count += 1  
     low_complexity = False
@@ -231,20 +233,15 @@ def parse_truth_table(table):
     for i in range(table_rows):
         for j in range(variable_amount):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
-
         print(f"Linha {i+1}: {table[i]} = Resultado: {solve_exp(tokens[list(tokens.keys())[-1]][0])}")
 
 def tokenize_linear_exp(exp):
-    global token_count
-    for op in ['.', '#', '+', '>', '=']: 
+    for op in ['.', '#', '+', '>', '=']:
+       
         while(op in exp and count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
-            
             matches = find_low_complexity_exp(exp, op) #Tenta achar o token op na exp
             exp = replace_in_exp(exp, matches)#Simplifica a exp, e adiciona tokens para poder ser "desimplificada" posteriormente
-    token_value = hex(token_count)
-    tokens[token_value] = [exp, None]  #Finalmente, adicionamos a exp final pra lista de tokens
-    var_to_tokens[exp] = token_value  
-    token_count += 1  
+    add_token(exp)
     return exp
 
 def linearize_parenthesis(extracted, matches):
@@ -257,15 +254,16 @@ def linearize_parenthesis(extracted, matches):
     while(len(extracted) > 0):
         exp = extracted[0][1:-1] #Remove os parenteses iniciais para começar
         del extracted[0] #Tira da list para simplificar o loop
-        token_value = hex(token_count)
-        tokens[token_value] = [exp, None]  
-        var_to_tokens[exp] = token_value  
-        token_count += 1  
+        
+        exp = tokenize_linear_exp(exp)
+        
+        add_token(exp)
         final_exp = exp
         for i in range(len(extracted)):
            
             extracted[i] =  extracted[i].replace("("+exp+")", var_to_tokens[exp])   
     matches = matches.replace(outer, var_to_tokens[final_exp])
+    
     return matches
 
 def replace_in_exp(exp, matches):
@@ -283,7 +281,8 @@ def replace_in_exp(exp, matches):
     return exp
 
 def count_op(exp):
-    pattern = r'[+>.=#]'
+    pattern = r'[+>\.=#]'
+    
     return len(regex.findall(pattern, exp, regex.VERSION1))
 
 def find_low_complexity_exp(exp, op):
@@ -297,12 +296,15 @@ def solve(text):
     parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
     while(parenthesis_step != []):
         tokenized = linearize_parenthesis(parenthesis_step, tokenized)
+        tokenize_linear_exp(tokenized)
         parenthesis_step = (extract_all_parentheses(tokenized))
-        tokenized = linearize_parenthesis(parenthesis_step, tokenized)
+        if(parenthesis_step != []):
+            tokenized = linearize_parenthesis(parenthesis_step, tokenized)
     tokenize_linear_exp(tokenized)
     parse_truth_table(create_truth_table())
+    
     input("\nPressione ENTER para continuar...\n")
-
+    
 def main():
     #text = "abacate.banana+carambola>(~(abacate.carambola)+carambola)" #Variaveis infinitas, com infinitos caracteres (em teoria )
     #text = "a.(b+c+(a.c+(a>b)))>c"
