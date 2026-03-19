@@ -1,4 +1,3 @@
-from ast import expr
 
 import regex
 '''
@@ -237,10 +236,15 @@ def parse_truth_table(table):
 
 def tokenize_linear_exp(exp):
     for op in ['.', '#', '+', '>', '=']:
-       
+        last_exp = ''
         while(op in exp and count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
             matches = find_low_complexity_exp(exp, op) #Tenta achar o token op na exp
             exp = replace_in_exp(exp, matches)#Simplifica a exp, e adiciona tokens para poder ser "desimplificada" posteriormente
+            if(exp == last_exp):
+                print("Loop infinito detectado(bug), expressão:", exp)
+                print(tokens)
+                break
+            last_exp = exp
     add_token(exp)
     return exp
 
@@ -286,7 +290,7 @@ def count_op(exp):
     return len(regex.findall(pattern, exp, regex.VERSION1))
 
 def find_low_complexity_exp(exp, op):
-    pattern = rf'[a-zA-Z0-9_]+[{op}][a-zA-Z0-9_]+'
+    pattern = rf'[~a-zA-Z0-9_]+[{op}][~a-zA-Z0-9_]+'
     matches = regex.findall(pattern, exp, regex.VERSION1)
     if(matches == None): print("Expressão Invalida ", exp, "com operador", op)
     return matches
@@ -311,6 +315,8 @@ def main():
     #text = "a.b+c+a.c+a>b>c"
     #text = "a.b+c+a.c+a>b>c+a.b"
     #text = "(((a.b)>(c+a))=((b>c).(a+c)))+(a.(b>c))"
+    #text = "(~p>p).~p.~p"
+    #solve(text)
     inp = ""
     while(1):
             clear()
