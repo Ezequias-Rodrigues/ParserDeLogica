@@ -151,6 +151,10 @@ def add_token(match):
     if(match in var_to_tokens): return var_to_tokens[match]
     global token_count
     global variable_amount
+    print(match)
+    if(count_op(match) == 0):
+        print(match)
+        match = match.replace("(", "").replace(")","")
     token_value = hex(token_count)  
     tokens[token_value] = [match, False]  
     var_to_tokens[match] = token_value  
@@ -242,7 +246,7 @@ def tokenize_linear_exp(exp):
             exp = replace_in_exp(exp, matches)#Simplifica a exp, e adiciona tokens para poder ser "desimplificada" posteriormente
             if(exp == last_exp):
                 print("Loop infinito detectado(bug), expressão:", exp)
-                print(tokens)
+                print("Tokens atuais: ", tokens)
                 break
             last_exp = exp
     add_token(exp)
@@ -286,7 +290,6 @@ def replace_in_exp(exp, matches):
 
 def count_op(exp):
     pattern = r'[+>\.=#]'
-    
     return len(regex.findall(pattern, exp, regex.VERSION1))
 
 def find_low_complexity_exp(exp, op):
@@ -316,6 +319,7 @@ def main():
     #text = "a.b+c+a.c+a>b>c+a.b"
     #text = "(((a.b)>(c+a))=((b>c).(a+c)))+(a.(b>c))"
     #text = "(~p>p).~p.~p"
+    #text = (p>q).(p.~q)>((r.s).(~s+~r)>t)
     #solve(text)
     inp = ""
     while(1):
