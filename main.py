@@ -1,5 +1,5 @@
-
 import regex
+import sys
 '''
 Simbolos que pretendo usar:
 - `.` para AND
@@ -20,7 +20,7 @@ variable_amount = 0
 table_rows = 0
 op_pattern = r'([+\.=>#])' #Operadores disponiveis
 
-def clear():
+def clear(): #Como o programa vai rodar infinitamente, limpa os tokens, tabelas e outras variaveis globais para não causar erros 
     global token_count
     global tokens
     global var_to_tokens
@@ -141,20 +141,14 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
             result = (A == B)
         case "#":
             result = (A ^ B)
-
-   # print("Matches ", matches)
-    #print(expr, " A:", A, mult[0], "B:", B, mult[1], " OP:", op, " R:", result, " N:", exp_negated)       
-    
     if(exp_negated): result = not result
     return result
 def add_token(match):
     if(match in var_to_tokens): return var_to_tokens[match]
     global token_count
     global variable_amount
-    print(match)
     if(count_op(match) == 0):
-        print(match)
-        match = match.replace("(", "").replace(")","")
+        match = match.replace("(", "").replace(")","") #Só para garantir que nenhum parenteses vai passar daqui aleatoriamente
     token_value = hex(token_count)  
     tokens[token_value] = [match, False]  
     var_to_tokens[match] = token_value  
@@ -232,28 +226,26 @@ def create_truth_table():
 
 def parse_truth_table(table):
     variable_lists.sort() #Não faria diferença aqui, PORÉM, é mais dificil de ler a tabela assim, e eu perdi uma quantidade de tempo que não me orgulho tentando arrumar um erro que não existia por causa dessa diferença
+    trues = 0
     print("X - -  " ,variable_lists)
     for i in range(table_rows):
         for j in range(variable_amount):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
-        print(f"Linha {i+1}: {table[i]} = Resultado: {solve_exp(tokens[list(tokens.keys())[-1]][0])}")
-
+        rexp = solve_exp(tokens[list(tokens.keys())[-1]][0])
+        trues = trues + 1 if rexp else trues 
+        print(f"Linha {i+1}: {table[i]} = Resultado: {rexp}")
+    print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == table_rows else "Contingência" if trues != 0 else "Contradição"}")
+    #print(f"{sys.getsizeof(tokens)+sys.getsizeof(variable_lists)}b usados para um total de {len(tokens.keys())} tokens e {variable_amount} proposições")
 def tokenize_linear_exp(exp):
     for op in ['.', '#', '+', '>', '=']:
-        last_exp = ''
         while(op in exp and count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
             matches = find_low_complexity_exp(exp, op) #Tenta achar o token op na exp
+            if(matches == []): break
             exp = replace_in_exp(exp, matches)#Simplifica a exp, e adiciona tokens para poder ser "desimplificada" posteriormente
-            if(exp == last_exp):
-                print("Loop infinito detectado(bug), expressão:", exp)
-                print("Tokens atuais: ", tokens)
-                break
-            last_exp = exp
     add_token(exp)
     return exp
 
 def linearize_parenthesis(extracted, matches):
-    global token_count
     extracted.sort(key = lambda x: len(x))
     if(extracted == []): return matches #O que não tem remédio, remediado está
     outer = extracted[-1] #Guarda o valor do ultimo index, que deve ser o mais complexo depois do sort
@@ -262,17 +254,17 @@ def linearize_parenthesis(extracted, matches):
     while(len(extracted) > 0):
         exp = extracted[0][1:-1] #Remove os parenteses iniciais para começar
         del extracted[0] #Tira da list para simplificar o loop
-        
         exp = tokenize_linear_exp(exp)
-        
         add_token(exp)
         final_exp = exp
         for i in range(len(extracted)):
-           
             extracted[i] =  extracted[i].replace("("+exp+")", var_to_tokens[exp])   
     matches = matches.replace(outer, var_to_tokens[final_exp])
-    
+
     return matches
+
+def is_linear(exp):
+    return exp.count("(") == 0
 
 def replace_in_exp(exp, matches):
     global token_count
@@ -293,7 +285,7 @@ def count_op(exp):
     return len(regex.findall(pattern, exp, regex.VERSION1))
 
 def find_low_complexity_exp(exp, op):
-    pattern = rf'[~a-zA-Z0-9_]+[{op}][~a-zA-Z0-9_]+'
+    pattern = rf'[(~a-zA-Z0-9_]+[{op}][~a-zA-Z0-9_)]+'
     matches = regex.findall(pattern, exp, regex.VERSION1)
     if(matches == None): print("Expressão Invalida ", exp, "com operador", op)
     return matches
@@ -301,15 +293,16 @@ def find_low_complexity_exp(exp, op):
 def solve(text):
     tokenized = tokenize_var(text)
     parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
-    while(parenthesis_step != []):
+    
+    while(not is_linear(tokenized)):
         tokenized = linearize_parenthesis(parenthesis_step, tokenized)
         tokenize_linear_exp(tokenized)
         parenthesis_step = (extract_all_parentheses(tokenized))
-        if(parenthesis_step != []):
+        if(not is_linear(tokenized)):
             tokenized = linearize_parenthesis(parenthesis_step, tokenized)
+  
     tokenize_linear_exp(tokenized)
     parse_truth_table(create_truth_table())
-    
     input("\nPressione ENTER para continuar...\n")
     
 def main():
@@ -319,8 +312,11 @@ def main():
     #text = "a.b+c+a.c+a>b>c+a.b"
     #text = "(((a.b)>(c+a))=((b>c).(a+c)))+(a.(b>c))"
     #text = "(~p>p).~p.~p"
-    #text = (p>q).(p.~q)>((r.s).(~s+~r)>t)
-    #solve(text)
+    #text = "(p>q).(p.~q)>((r.s).(~s+~r)>t)"
+    #(p.~p).(a.~a).((b.~b).(c.~c))>t
+   # text = "~(p+q)>~(~p.r).(~s.s)" SÓ TO TESTANDO pq já sei a resposta e queria checar se ainda ta bugado, vou resolver na mão, prometo
+   # solve(text)
+    #print(tokens)
     inp = ""
     while(1):
             clear()
