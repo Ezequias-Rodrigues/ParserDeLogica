@@ -1,5 +1,5 @@
 import regex
-import sys
+#import sys
 '''
 Simbolos que pretendo usar:
 - `.` para AND
@@ -10,9 +10,7 @@ Simbolos que pretendo usar:
 - `~` para NEGACÃO
 - `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.
 '''
-
 token_count = 0
-
 tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
 var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
 variable_lists = []
