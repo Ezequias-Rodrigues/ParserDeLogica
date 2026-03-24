@@ -1,5 +1,5 @@
 import regex
-#import sys
+import sys
 '''
 Simbolos que pretendo usar:
 - `.` para AND
@@ -10,6 +10,11 @@ Simbolos que pretendo usar:
 - `~` para NEGACÃO
 - `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.
 '''
+m_tokens = [{},{}]
+m_var_to_tokens = [{}, {}]
+m_token_count = [0,0]
+m_variable_count = [0,0]
+m_variable_list = [[],[]]
 token_count = 0
 tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
 var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
@@ -17,7 +22,7 @@ variable_lists = []
 variable_amount = 0
 table_rows = 0
 op_pattern = r'([+\.=>#])' #Operadores disponiveis
-
+mode = "-n"
 def clear(): #Como o programa vai rodar infinitamente, limpa os tokens, tabelas e outras variaveis globais para não causar erros 
     global token_count
     global tokens
@@ -243,6 +248,9 @@ def tokenize_linear_exp(exp):
     add_token(exp)
     return exp
 
+def parse_equivalence():
+    pass
+
 def linearize_parenthesis(extracted, matches):
     extracted.sort(key = lambda x: len(x))
     if(extracted == []): return matches #O que não tem remédio, remediado está
@@ -304,6 +312,7 @@ def solve(text):
     input("\nPressione ENTER para continuar...\n")
     
 def main():
+    global mode
     #text = "abacate.banana+carambola>(~(abacate.carambola)+carambola)" #Variaveis infinitas, com infinitos caracteres (em teoria )
     #text = "a.(b+c+(a.c+(a>b)))>c"
     #text = "a.b+c+a.c+a>b>c"
@@ -315,10 +324,11 @@ def main():
    # text = "~(p+q)>~(~p.r).(~s.s)" SÓ TO TESTANDO pq já sei a resposta e queria checar se ainda ta bugado, vou resolver na mão, prometo
    # solve(text)
     #print(tokens)
+    if(len(sys.argv) > 1):
+        mode = sys.argv[1]
     inp = ""
     while(1):
             clear()
-        #try:
             print(
                 "\nSimbolos disponíveis:\n"\
                 "- `.` para AND\n"\
@@ -329,15 +339,23 @@ def main():
                 "- `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.\n" \
                 "Nota: Evite utilizar nomes de váriaveis com sequências de caracteres repetidas, ex: AAAAA, BABABABA etc\n"\
                 "Digite `exit` para sair\n"\
-                "Favor reportar qualquer erro que encontrar.\n"
+                "Favor reportar qualquer erro que encontrar.\n"\
+                "Modo: " + {"-n": "Normal", "-e": "Equivalência"}[mode]
             )
             inp = input("Digite sua equação: ").replace(" ", "")
+            inp2 = ""
             if(inp == "exit" or inp == ""):
                 return
-            solve(inp)
-        #except:
-          #  print("Verifique sua equação, não foi possível interpretar ela (", inp, ")")
-            #input("\nPressione ENTER para continuar...\n")
+            match mode:
+                case "-n":
+
+                    solve(inp)
+                    break
+                case "-c":
+                    inp2 = input("Digite sua segunda equação: ").replace(" ", "")
+                    if(inp2 == "exit" or inp2 == ""):
+                        return
+                    break
 
 if __name__ == "__main__":
     main()
