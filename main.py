@@ -17,7 +17,7 @@ variable_lists = []
 variable_amount = 0
 table_rows = 0
 op_pattern = r'([+\.=>#])' #Operadores disponiveis
-
+linearize_parenthesis_pattern = r'(.*[^()])'
 def clear(): #Como o programa vai rodar infinitamente, limpa os tokens, tabelas e outras variaveis globais para não causar erros 
     global token_count
     global tokens
@@ -92,7 +92,8 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     global op_pattern
     
     exp_negated = expr.find("~(") != -1 #Aqui vai chegar sempre expressão simples, se tiver um ~( SEMPRE vai significar que ela é o inverso
-    expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
+    expr = regex.match(linearize_parenthesis_pattern, expr, regex.VERSION1)[0]
+    #expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
     op = get_op(expr)
 
     if(op == None): #Sem operador = resolvido
@@ -311,6 +312,7 @@ def main():
     #text = "(((a.b)>(c+a))=((b>c).(a+c)))+(a.(b>c))"
     #text = "(~p>p).~p.~p"
     #text = "(p>q).(p.~q)>((r.s).(~s+~r)>t)"
+    #((p>(q>r))>((p+~q).r) ->   2f 6v
     #(p.~p).(a.~a).((b.~b).(c.~c))>t
    # text = "~(p+q)>~(~p.r).(~s.s)" SÓ TO TESTANDO pq já sei a resposta e queria checar se ainda ta bugado, vou resolver na mão, prometo
    # solve(text)
