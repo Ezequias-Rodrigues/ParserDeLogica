@@ -17,7 +17,7 @@ variable_lists = []
 variable_amount = 0
 table_rows = 0
 op_pattern = r'([+\.=>#])' #Operadores disponiveis
-linearize_parenthesis_pattern = r'(.*[^()])'
+linear_parenthesis_pattern = r'([^()]*)'
 def clear(): #Como o programa vai rodar infinitamente, limpa os tokens, tabelas e outras variaveis globais para não causar erros 
     global token_count
     global tokens
@@ -91,16 +91,18 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
     if(type(expr) is bool): return expr
     global op_pattern
     
+
     exp_negated = expr.find("~(") != -1 #Aqui vai chegar sempre expressão simples, se tiver um ~( SEMPRE vai significar que ela é o inverso
-    expr = regex.match(linearize_parenthesis_pattern, expr, regex.VERSION1)[0]
-    #expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
+    expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
     op = get_op(expr)
+    
 
     if(op == None): #Sem operador = resolvido
         if(expr.find("~") != 1): #Tokens sem operadores também podem ser negados, ex: (~a)
-            return not tokens[expr.replace("~", "")][1]
-        return tokens[expr][1]
-    
+            expr = expr.replace("~", "")
+            return (not solve_exp(tokens[expr][0]) if expr in tokens.keys() else not tokens[var_to_tokens[expr]] if expr in var_to_tokens.keys() else None) if not expr in variable_lists else not tokens[var_to_tokens[expr]][1] #Digno de postar no r/programminghorror
+        return (solve_exp(tokens[expr][0]) if expr in tokens.keys() else tokens[var_to_tokens[expr]] if expr in var_to_tokens.keys() else None) if not expr in variable_lists else tokens[var_to_tokens[expr]][1] #Sono faz a gente fazer coisas incriveis...
+
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     matches = list(regex.findall(pattern, expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
     #Aqui vou ter que criar um jeito para lidar com negações
@@ -127,7 +129,7 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
 
     if(not mult[0]):A = not A
     if(not mult[1]):B = not B
-
+    
     result = None
     match op:
         case ".":
@@ -232,7 +234,9 @@ def parse_truth_table(table):
             tokens[var_to_tokens[variable_lists[j]]][1] = table[i][j]   
         rexp = solve_exp(tokens[list(tokens.keys())[-1]][0])
         trues = trues + 1 if rexp else trues 
+        #print(tokens)
         print(f"Linha {i+1}: {table[i]} = Resultado: {rexp}")
+    
     print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == table_rows else "Contingência" if trues != 0 else "Contradição"}")
     #print(f"{sys.getsizeof(tokens)+sys.getsizeof(variable_lists)}b usados para um total de {len(tokens.keys())} tokens e {variable_amount} proposições")
 def tokenize_linear_exp(exp):
@@ -263,6 +267,7 @@ def linearize_parenthesis(extracted, matches):
     return matches
 
 def is_linear(exp):
+    
     return exp.count("(") == 0
 
 def replace_in_exp(exp, matches):
@@ -294,14 +299,17 @@ def solve(text):
     parenthesis_step = extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
     
     while(not is_linear(tokenized)):
+    
         tokenized = linearize_parenthesis(parenthesis_step, tokenized)
         tokenize_linear_exp(tokenized)
         parenthesis_step = (extract_all_parentheses(tokenized))
         if(not is_linear(tokenized)):
             tokenized = linearize_parenthesis(parenthesis_step, tokenized)
+        tokens.popitem()
   
     tokenize_linear_exp(tokenized)
     parse_truth_table(create_truth_table())
+    
     input("\nPressione ENTER para continuar...\n")
     
 def main():
@@ -312,10 +320,10 @@ def main():
     #text = "(((a.b)>(c+a))=((b>c).(a+c)))+(a.(b>c))"
     #text = "(~p>p).~p.~p"
     #text = "(p>q).(p.~q)>((r.s).(~s+~r)>t)"
-    #((p>(q>r))>((p+~q).r) ->   2f 6v
     #(p.~p).(a.~a).((b.~b).(c.~c))>t
    # text = "~(p+q)>~(~p.r).(~s.s)" SÓ TO TESTANDO pq já sei a resposta e queria checar se ainda ta bugado, vou resolver na mão, prometo
-   # solve(text)
+   # text = "(p>(q>r))>((p+~q).r)"
+    #solve(text)
     #print(tokens)
     inp = ""
     while(1):
@@ -340,6 +348,6 @@ def main():
         #except:
           #  print("Verifique sua equação, não foi possível interpretar ela (", inp, ")")
             #input("\nPressione ENTER para continuar...\n")
-
+    
 if __name__ == "__main__":
     main()
