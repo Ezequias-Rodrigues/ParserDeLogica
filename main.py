@@ -405,6 +405,9 @@ def main():
                 "- `=` para BICONDICIONAL\n"\
                 "- `~` para NEGACÃO\n"\
                 "- `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.\n" \
+                "- Use <exp1> ? <exp2> para checar se exp1 é consequência lógica de exp2.\n"\
+                "- Use <exp1> : <exp2> para checar se exp1 é equivalente a exp2.\n"\
+                "- Use <exp1> @ <linha> para checar o resultado de uma única linha da tabela verdade\n"\
                 "Nota: Evite utilizar nomes de váriaveis com sequências de caracteres repetidas, ex: AAAAA, BABABABA etc\n"\
                 "Digite `exit` para sair\n"\
                 "Favor reportar qualquer erro que encontrar.\n"
