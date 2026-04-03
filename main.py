@@ -17,6 +17,8 @@ class Parser:
         self.variable_lists = []
         self.variable_amount = 0
         self.table_rows = 0
+        self.table = None
+        self.table_len = 0
         self.op_pattern = r'([+\.=>#])' #Operadores disponiveis
         self.linear_parenthesis_pattern = r'([^()]*)'
 
@@ -201,29 +203,36 @@ class Parser:
                 return False
         return matches
 
+    def parse_truth_table_line(self, line):
+        for i in range(self.variable_amount):
+            self.tokens[self.var_to_tokens[self.variable_lists[i]]][1] = self.table[line][i]   
+        rexp = self.solve_exp(self.tokens[list(self.tokens.keys())[-1]][0])
+         
+        return rexp
+            #print(f"Linha {i+1}: {self.table[i]} = Resultado: {rexp}")
+     
+
     def create_truth_table(self):
-        table = None
+        self.table = None #Limpa a tabela para recalcular
         for i in range(self.table_rows):
-            if(table == None):
-                table = [[False] * self.variable_amount]
+            if(self.table == None):
+                self.table = [[False] * self.variable_amount]
             else:
-                table.append([False] * self.variable_amount)
+                self.table.append([False] * self.variable_amount)
             rowBinValue = bin(i)[2:].zfill(self.variable_amount) #Gera o valor binário da linha atual, preenchendo com zeros à esquerda para garantir que tenha o mesmo número de dígitos que o número de variáveis
             for j in range(self.variable_amount):
-                table[i][j] = rowBinValue[j] == '1'
-        return table[::-1] #Invertendo a orientação da tabela para seguir oq a gente viu em aula, apesar de não fazer diferença
-
-    def parse_truth_table(self, table):
+                self.table[i][j] = rowBinValue[j] == '1'
+        self.table =  self.table[::-1] #Invertendo a orientação da tabela para seguir oq a gente viu em aula, apesar de não fazer diferença
+        self.table_len = len(self.table)
+    def parse_truth_table(self):
         self.variable_lists.sort() #Não faria diferença aqui, PORÉM, é mais dificil de ler a tabela assim, e eu perdi uma quantidade de tempo que não me orgulho tentando arrumar um erro que não existia por causa dessa diferença
         trues = 0
         print("X - -  " ,self.variable_lists)
         for i in range(self.table_rows):
-            for j in range(self.variable_amount):
-                self.tokens[self.var_to_tokens[self.variable_lists[j]]][1] = table[i][j]   
-            rexp = self.solve_exp(self.tokens[list(self.tokens.keys())[-1]][0])
-            trues = trues + 1 if rexp else trues 
+            line = self.parse_truth_table_line(i)
+            trues = trues + 1 if line else trues 
             #print(tokens)
-            print(f"Linha {i+1}: {table[i]} = Resultado: {rexp}")
+            print(f"Linha {i+1}: {self.table[i]} = Resultado: {line}")
         
         print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == self.table_rows else "Contingência" if trues != 0 else "Contradição"}")
 
@@ -294,9 +303,92 @@ class Parser:
             self.tokens.popitem()
     
         self.tokenize_linear_exp(tokenized)
-        self.parse_truth_table(self.create_truth_table())
 
-    
+def parse_expression_input(exp):
+    exp = exp.replace(" ", "") #Remover todo e qualquer espaço, ele não possui função atualmente, e ""pode"" atrapalhar a interpretação da expressão
+    """
+    A.B = Padrão
+    A.B : B.A = Comparação
+    A.B ? B.A = Consequencia lógica
+    A.B @ 1 = Resolver somente linha 1
+    """
+    if(exp.find(":") != -1):
+        exprs = exp.split(":")
+        try:
+            assert(len(exprs) == 2)
+            expr1 = Parser()
+            expr2 = Parser() #Duas instancias, cada uma dela vai interpretar uma expressão, dps a gente compara linha por linha para ver se elas são iguais
+            expr1.solve(exprs[0])
+            expr2.solve(exprs[1])
+            if(expr1.variable_amount != expr2.variable_amount): 
+                print("[RESULTADO] As duas expressões NÃO são equivalentes, pois a primeira expressão tem", expr1.variable_amount, "proposições, e a segunda tem", expr2.variable_amount)
+                return
+            varList1 = expr1.variable_lists.copy()
+            varList1.sort()
+            varList2 = expr2.variable_lists.copy()
+            varList2.sort() #Arruma as listas de variaveis pra evitar que elas não sejam iguais só por estarem em ordens diferentes
+            if(varList1 != varList2):
+                print("[RESULTADO] As expressões não são equivalente, pois", exprs[0], "e", exprs[1], "usam variaveis diferentes")
+                return
+            expr1.create_truth_table()
+            expr2.create_truth_table()
+            for i in range(expr1.table_len): #Elas tem a mesma quantidade de linhas
+                if(expr1.parse_truth_table_line(i) != expr2.parse_truth_table_line(i)):
+                    print("[RESULTADO]", exprs[0], "NÃO equivale a", exprs[1])
+                    return
+            print("[RESULTADO]", exprs[0], "equivale a", exprs[1])
+        except AssertionError:
+            print("O formato de comparação é <expressão 1> : <expressão 2>") 
+    elif(exp.find("?") != -1):
+        exprs = exp.split("?")
+        try:
+            assert(len(exprs) == 2)
+            expr1 = Parser()
+            expr2 = Parser()
+            expr1.solve(exprs[0])
+            expr2.solve(exprs[1])
+            if(expr1.variable_amount != expr2.variable_amount): 
+                print("[RESULTADO] Não existe relação de equivalência lógica entre as expressões, pois a primeira expressão tem", expr1.variable_amount, "proposições, e a segunda tem", expr2.variable_amount)
+                return
+            varList1 = expr1.variable_lists.copy()
+            varList1.sort()
+            varList2 = expr2.variable_lists.copy()
+            varList2.sort()
+            if(varList1 != varList2):
+                print("[RESULTADO] Não existe relação de equivalência lógica entre as expressões, pois", exprs[0], "e", exprs[1], "usam variaveis diferentes")
+                return
+            expr1.create_truth_table()
+            expr2.create_truth_table()
+            for i in range(expr1.table_len): #Elas tem a mesma quantidade de linhas
+                if(not (not (expr1.parse_truth_table_line(i)) or expr2.parse_truth_table_line(i))):
+                    print("[RESULTADO]", exprs[0], "NÃO é consequencia lógica de", exprs[1])
+                    return
+            print("[RESULTADO]", exprs[0], "é consequencia lógica de", exprs[1])
+        except AssertionError:
+            print("O formato de consequencia lógica é <expressão 1> ? <expressão 2>") 
+    elif(exp.find("@") != -1):
+        exprs = exp.split("@")
+        try:
+            assert(len(exprs) == 2)
+            line = int(exprs[1]) 
+            assert(line >= 0)
+            expr1 = Parser()
+            expr1.solve(exprs[0])
+            expr1.create_truth_table()
+            if(line >= expr1.table_len):
+                print("O numero da linha fornecido deve ser menor que ao valor de linhas da tabela", line, " > ", expr1.table_len-1)
+                return
+            print(f"Linha {line}: {expr1.table[line]} = Resultado: {expr1.parse_truth_table_line(line)}")
+        except ValueError:
+            print("O número da linha deve ser um valor númerico e inteiro")
+        except AssertionError:
+            print("O formato da interpretação de linha única é <expressão 1> @ <numero da linha inteiro e positivo>") 
+    else:
+        expr1 = Parser()
+        expr1.solve(exp)
+        expr1.create_truth_table()
+        expr1.parse_truth_table()
+
 def main():
     '''
      
@@ -321,7 +413,11 @@ def main():
             v = Parser()
             if(inp == "exit" or inp == ""):
                 return
-            v.solve(inp)
+            parse_expression_input(inp)
+            #v.solve(inp)
+            #v.create_truth_table()
+            #v.parse_truth_table()
+            #print(v.parse_truth_table_line(1))
             input("Pressione [Enter] para continuar")
 
 if __name__ == "__main__":
