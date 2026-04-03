@@ -102,10 +102,6 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
             expr = expr.replace("~", "")
             return (not solve_exp(tokens[expr][0]) if expr in tokens.keys() else not tokens[var_to_tokens[expr]] if expr in var_to_tokens.keys() else None) if not expr in variable_lists else not tokens[var_to_tokens[expr]][1] #Digno de postar no r/programminghorror
         return (solve_exp(tokens[expr][0]) if expr in tokens.keys() else tokens[var_to_tokens[expr]] if expr in var_to_tokens.keys() else None) if not expr in variable_lists else tokens[var_to_tokens[expr]][1] #Sono faz a gente fazer coisas incriveis...
-    
-            expr = expr.replace("~", "")
-            return (not solve_exp(tokens[expr][0]) if expr in tokens.keys() else not tokens[var_to_tokens[expr]] if expr in var_to_tokens.keys() else None) if not expr in variable_lists else not tokens[var_to_tokens[expr]][1] #Digno de postar no r/programminghorror
-        return (solve_exp(tokens[expr][0]) if expr in tokens.keys() else tokens[var_to_tokens[expr]] if expr in var_to_tokens.keys() else None) if not expr in variable_lists else tokens[var_to_tokens[expr]][1] #Sono faz a gente fazer coisas incriveis...
 
     pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
     matches = list(regex.findall(pattern, expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
@@ -133,7 +129,6 @@ def solve_exp(expr): #Eu acredito que qualquer expressão lógica pode ser resum
 
     if(not mult[0]):A = not A
     if(not mult[1]):B = not B
-    
     
     result = None
     match op:
@@ -242,7 +237,6 @@ def parse_truth_table(table):
         #print(tokens)
         print(f"Linha {i+1}: {table[i]} = Resultado: {rexp}")
     
-    
     print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == table_rows else "Contingência" if trues != 0 else "Contradição"}")
     #print(f"{sys.getsizeof(tokens)+sys.getsizeof(variable_lists)}b usados para um total de {len(tokens.keys())} tokens e {variable_amount} proposições")
 def tokenize_linear_exp(exp):
@@ -316,7 +310,6 @@ def solve(text):
     tokenize_linear_exp(tokenized)
     parse_truth_table(create_truth_table())
     
-   
     input("\nPressione ENTER para continuar...\n")
     
 def main():
