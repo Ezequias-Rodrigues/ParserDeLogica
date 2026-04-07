@@ -3,7 +3,7 @@ class Parser:
     '''
     Simbolos que pretendo usar:
     - `.` para AND
-    - `#` para XOR (o ^ é usado pra regex, e como eu to implementando isso depois eu REALMENTE não quero mexer muito nas regex que já estão funcionando)
+    - `^` para XOR 
     - `+` para OR
     - `>` para IMPLICAÇÃO
     - `=` para BICONDICIONAL
@@ -21,7 +21,7 @@ class Parser:
         self.table_rows = 0
         self.table = None
         self.table_len = 0
-        self.op_pattern = r'([+\.=>\\^])' #Operadores disponiveis
+        self.op_pattern = r'([+\.=>^])' #Operadores disponiveis
         self.token_pattern = r'(0x\d+)'
         self.linear_parenthesis_pattern = r'([^()]*)'
 
@@ -54,13 +54,10 @@ class Parser:
 
     #Fora os parenteses, vou implementar a tokenização das expressões da de menor precedencia para a de maior, pq no caso dos parenteses, isso já é implicitamente resolvido
     def extract_op(self, text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
-        #Sei que é má prática MAAAAAAAAAAS acredito que dê para resolver isso usando splits ao invés de regex
-        #Desde já, peço seu perdão
         exclude_keys = list(self.tokens.keys())
         exclude_keys.append('') #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
         exclude_keys.append('(')
         exclude_keys.append(')')#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
-        
         if result == None:
             result = []
         if(r2l): matches = text.split(op,1)
@@ -68,9 +65,8 @@ class Parser:
         #print("OP", op , "Matches",matches,"Result", result,"Exclude", exclude_keys)
         isAlreadyStored = matches[0] in result #Evita duplicadas
         isExcluded =  matches[0] in exclude_keys  #Evita caracteres nulos e outros "artefatos" no código
-        unbalancedMatch = matches[0].count("(") != matches[0].count(")") #Olha, não era pra chegar parenteses aberto aqui, PORÉM...
+        unbalancedMatch = matches[0].count("(") != matches[0].count(")")
         if(text != matches[0]  and  not isExcluded and not isAlreadyStored and not unbalancedMatch): result.append(matches[0])
-    # print("Match", matches[0], "Sole" ,isSoleVariable, "Excluded", isExcluded, "Stored", isAlreadyStored, "Result", result)
         if(len(matches) > 1 ):
             unbalancedMatch = matches[1].count("(") != matches[1].count(")")
             
@@ -155,7 +151,7 @@ class Parser:
         return token_value
     
     def tokenize_var(self, text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
-        pattern = r'[a-zA-Z]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
+        pattern = r'[a-zA-Z0-9]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
         matches = regex.findall(pattern, text, regex.VERSION1)
 
         for match in matches:
@@ -316,7 +312,7 @@ class Parser:
         print("\n[Depuração] Como a expressão foi entendida", self.recreate_exp_from_tokens())
     
     def tokenize_linear_exp(self, exp):
-        for op in ['^', '.' , '+', '>', '=']:
+        for op in [ '.', '^' , '+', '>', '=']:
             while(op in exp and self.count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
                 matches = self.find_low_complexity_exp(exp, op) #Tenta achar o token op na exp
                 if(matches == []): break
@@ -412,7 +408,7 @@ def parse_expression_input(exp):
             expr1.create_truth_table()
             expr2.create_truth_table()
             for i in range(expr1.table_len): #Elas tem a mesma quantidade de linhas
-                if(expr1.parse_truparse_truth_table_line(i) != expr2.parse_truth_table_line(i)):
+                if(expr1.parse_truth_table_line(i) != expr2.parse_truth_table_line(i)):
                     print("[RESULTADO]", exprs[0], "NÃO equivale a", exprs[1])
                     return
             print("[RESULTADO]", exprs[0], "equivale a", exprs[1])
@@ -438,14 +434,19 @@ def parse_expression_input(exp):
                 return
             expr1.create_truth_table()
             expr2.create_truth_table()
+            rl = True
+            lr = True
             for i in range(expr1.table_len): #Elas tem a mesma quantidade de linhas
-                if(not (not (expr1.parse_truth_table_line(i)) or expr2.parse_truth_table_line(i))):
+                if(lr and not (not (expr1.parse_truth_table_line(i)) or expr2.parse_truth_table_line(i))):
                     print("[RESULTADO]", exprs[1], "NÃO é consequencia lógica de", exprs[0])
-            for i in range(expr1.table_len): 
-                if(not (not (expr1.parse_truth_table_line(i)) or expr2.parse_truth_table_line(i))):
+                    lr = False
+                if(rl and not (not (expr2.parse_truth_table_line(i)) or expr1.parse_truth_table_line(i))):
                     print("[RESULTADO]", exprs[0], "NÃO é consequencia lógica de", exprs[1])
-                    return
-            print("[RESULTADO]", exprs[0], "é consequencia lógica de", exprs[1])
+                    rl = False
+                if(not rl and not lr): break
+
+            if(rl) : print("[RESULTADO]", exprs[0], "é consequencia lógica de", exprs[1])
+            if(lr) : print("[RESULTADO]", exprs[1], "é consequencia lógica de", exprs[0])
         except AssertionError:
             print("O formato de consequencia lógica é <expressão 1> ? <expressão 2>") 
     elif(exp.find("@") != -1):
@@ -487,6 +488,7 @@ def main():
                 "- `+` para OR\n"\
                 "- `>` para IMPLICAÇÃO\n"\
                 "- `=` para BICONDICIONAL\n"\
+                '- `^` para XOR - NOTA: XOR tem precedência sobre AND nesse código, pois não consegui encontrar um consenso sobre isso\n'
                 "- `~` para NEGACÃO\n"\
                 "- `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.\n" \
                 "- Use <exp1> ? <exp2> para checar se exp1 é consequência lógica de exp2.\n"\
@@ -501,10 +503,6 @@ def main():
             if(inp == "exit" or inp == ""):
                 return
             parse_expression_input(inp)
-            #v.solve(inp)
-            #v.create_truth_table()
-            #v.parse_truth_table()
-            #print(v.parse_truth_table_line(1))
             input("Pressione [Enter] para continuar")
 
 if __name__ == "__main__":
