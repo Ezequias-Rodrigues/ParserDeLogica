@@ -13,6 +13,8 @@ class Parser:
     def __init__(self):
         self.token_count = 0
         self.tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
+        self.tokens_canon_and_equivalent = {}
+        self.tokens_canon_or_equivalent = {}
         self.var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
         self.variable_lists = []
         self.variable_amount = 0
@@ -80,9 +82,11 @@ class Parser:
 
     def solve_exp(self, expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
         if(type(expr) is bool): return expr
+          
         expr = expr.replace("~~", "") #Isso aqui deve lidar com a dupla negação. Existem técnicas para distribuir a negação para as expressões, e as vezes, fazendo na mão, a dupla negação é util, mas nesse algoritmo isso não faz diferença
 
         exp_negated = expr.find("~(") != -1 #Aqui vai chegar sempre expressão simples, se tiver um ~( SEMPRE vai significar que ela é o inverso
+        
         expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
         op = self.get_op(expr)
         
@@ -199,11 +203,47 @@ class Parser:
                 return False
         return matches
 
-    def recreate_exp_from_tokens(self, expr):
-        return
+    def create_canon_and_equivalent(self):
+        for token_id in self.tokens:
+            token = self.tokens[token_id][0]
+            if(self.count_op(token) == 0 or self.get_op(token) == "."):
+                self.tokens_canon_and_equivalent[token_id] = self.tokens[token_id][0]
+            else:
+                self.tokens_canon_and_equivalent[token_id] =self.canonize_simple_exp_and(token)
+
+    def get_canon_and(self):
+        self.create_canon_and_equivalent()
+        expr = self.tokens_canon_and_equivalent[list(self.tokens_canon_and_equivalent.keys())[-1]]
         while(expr.find("0x") != -1):
             matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
-            print(matches)
+            for token in matches:
+                untokenized_exp = self.tokens_canon_and_equivalent[token]
+                replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
+                expr = expr.replace(token, replace_exp)
+        return expr
+    
+    def canonize_simple_exp_and(self, expr):
+        op = self.get_op(expr)
+        matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+        match op:
+            case "+":
+                return f"~(~{matches[0]}.~{matches[1]})"
+            case ">":
+                return f"~({matches[0]}.~{matches[1]})"
+            case "=": #¬(¬A∧B)∧¬(A∧¬B) 
+                return f"~(~{matches[0]}.{matches[1]}).~({matches[0]}.~{matches[1]})"
+            case "^":
+                return f"~(~(~{matches[0]}.{matches[1]}).~({matches[0]}.~{matches[1]}))"
+        pass
+    def recreate_exp_from_tokens(self):
+        expr = self.tokens[list(self.tokens.keys())[-1]][0]
+        while(expr.find("0x") != -1):
+            matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+            for token in matches:
+                untokenized_exp = self.tokens[token][0]
+                replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
+                expr = expr.replace(token, replace_exp)
+        return expr
 
     def parse_truth_table_line(self, line):
         for i in range(self.variable_amount):
@@ -237,7 +277,8 @@ class Parser:
             print(f"Linha {i+1}: {self.table[i]} = Resultado: {line}")
         
         print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == self.table_rows else "Contingência" if trues != 0 else "Contradição"}")
-
+        print("\n[Depuração] Como a expressão foi entendida", self.recreate_exp_from_tokens())
+    
     def tokenize_linear_exp(self, exp):
         for op in ['^', '.' , '+', '>', '=']:
             while(op in exp and self.count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
@@ -301,10 +342,11 @@ class Parser:
             parenthesis_step = (self.extract_all_parentheses(tokenized))
             if(not self.is_linear(tokenized)):
                 tokenized = self.linearize_parenthesis(parenthesis_step, tokenized) 
-            if(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 ): self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores, isso significa que o penultimo é a resolução real, então remove ele
-        
+            if(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 and
+                self.tokens[list(self.tokens.keys())[-1]][0].find("~") == -1 ): self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores E não negada, isso significa que o penultimo é a resolução real, então remove ele
         self.tokenize_linear_exp(tokenized)
-        print(self.recreate_exp_from_tokens(tokenized))
+        
+
 def parse_expression_input(exp):
     exp = exp.replace(" ", "") #Remover todo e qualquer espaço, ele não possui função atualmente, e ""pode"" atrapalhar a interpretação da expressão
     """
@@ -334,7 +376,7 @@ def parse_expression_input(exp):
             expr1.create_truth_table()
             expr2.create_truth_table()
             for i in range(expr1.table_len): #Elas tem a mesma quantidade de linhas
-                if(expr1.parse_truth_table_line(i) != expr2.parse_truth_table_line(i)):
+                if(expr1.parse_truparse_truth_table_line(i) != expr2.parse_truth_table_line(i)):
                     print("[RESULTADO]", exprs[0], "NÃO equivale a", exprs[1])
                     return
             print("[RESULTADO]", exprs[0], "equivale a", exprs[1])
@@ -361,6 +403,9 @@ def parse_expression_input(exp):
             expr1.create_truth_table()
             expr2.create_truth_table()
             for i in range(expr1.table_len): #Elas tem a mesma quantidade de linhas
+                if(not (not (expr1.parse_truth_table_line(i)) or expr2.parse_truth_table_line(i))):
+                    print("[RESULTADO]", exprs[1], "NÃO é consequencia lógica de", exprs[0])
+            for i in range(expr1.table_len): 
                 if(not (not (expr1.parse_truth_table_line(i)) or expr2.parse_truth_table_line(i))):
                     print("[RESULTADO]", exprs[0], "NÃO é consequencia lógica de", exprs[1])
                     return
@@ -389,6 +434,7 @@ def parse_expression_input(exp):
         expr1.solve(exp)
         expr1.create_truth_table()
         expr1.parse_truth_table()
+        print("Forma canônica E: " + expr1.get_canon_and())
 
 def main():
     '''
