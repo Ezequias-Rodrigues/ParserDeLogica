@@ -20,6 +20,7 @@ class Parser:
         self.table = None
         self.table_len = 0
         self.op_pattern = r'([+\.=>\\^])' #Operadores disponiveis
+        self.token_pattern = r'(0x\d+)'
         self.linear_parenthesis_pattern = r'([^()]*)'
 
     def extract_all_parentheses(self, text):
@@ -79,7 +80,7 @@ class Parser:
 
     def solve_exp(self, expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
         if(type(expr) is bool): return expr
-
+        expr = expr.replace("~~", "") #Isso aqui deve lidar com a dupla negação. Existem técnicas para distribuir a negação para as expressões, e as vezes, fazendo na mão, a dupla negação é util, mas nesse algoritmo isso não faz diferença
 
         exp_negated = expr.find("~(") != -1 #Aqui vai chegar sempre expressão simples, se tiver um ~( SEMPRE vai significar que ela é o inverso
         expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
@@ -198,6 +199,12 @@ class Parser:
                 return False
         return matches
 
+    def recreate_exp_from_tokens(self, expr):
+        return
+        while(expr.find("0x") != -1):
+            matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+            print(matches)
+
     def parse_truth_table_line(self, line):
         for i in range(self.variable_amount):
             self.tokens[self.var_to_tokens[self.variable_lists[i]]][1] = self.table[line][i]   
@@ -295,9 +302,9 @@ class Parser:
             if(not self.is_linear(tokenized)):
                 tokenized = self.linearize_parenthesis(parenthesis_step, tokenized) 
             if(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 ): self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores, isso significa que o penultimo é a resolução real, então remove ele
-    
+        
         self.tokenize_linear_exp(tokenized)
-
+        print(self.recreate_exp_from_tokens(tokenized))
 def parse_expression_input(exp):
     exp = exp.replace(" ", "") #Remover todo e qualquer espaço, ele não possui função atualmente, e ""pode"" atrapalhar a interpretação da expressão
     """
