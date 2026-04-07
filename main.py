@@ -78,9 +78,8 @@ class Parser:
 
     def solve_exp(self, expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
         if(type(expr) is bool): return expr
-          
+      
         expr = expr.replace("~~", "") #Isso aqui deve lidar com a dupla negação. Existem técnicas para distribuir a negação para as expressões, e as vezes, fazendo na mão, a dupla negação é util, mas nesse algoritmo isso não faz diferença
-
         exp_negated = expr.find("~(") != -1 #Aqui vai chegar sempre expressão simples, se tiver um ~( SEMPRE vai significar que ela é o inverso
         
         expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
@@ -144,6 +143,9 @@ class Parser:
 
         if(self.count_op(match) == 0):
             match = match.replace("(", "").replace(")","") #Só para garantir que nenhum parenteses vai passar daqui aleatoriamente
+        match = match.replace("~~", "") #Lidando com dupla negação aqui também, pois dupla negação com parenteses não é pega na proxima etapa
+        if(match in self.var_to_tokens): return self.var_to_tokens[match]
+     
         token_value = hex(self.token_count)  
         self.tokens[token_value] = [match, False]  
         self.var_to_tokens[match] = token_value  
@@ -374,6 +376,7 @@ class Parser:
             parenthesis_step = (self.extract_all_parentheses(tokenized))
             if(not self.is_linear(tokenized)):
                 tokenized = self.linearize_parenthesis(parenthesis_step, tokenized) 
+            
             if(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 and
                 self.tokens[list(self.tokens.keys())[-1]][0].find("~") == -1 ): self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores E não negada, isso significa que o penultimo é a resolução real, então remove ele
         self.tokenize_linear_exp(tokenized)
@@ -488,7 +491,7 @@ def main():
                 "- `+` para OR\n"\
                 "- `>` para IMPLICAÇÃO\n"\
                 "- `=` para BICONDICIONAL\n"\
-                '- `^` para XOR - NOTA: XOR tem precedência sobre AND nesse código, pois não consegui encontrar um consenso sobre isso\n'
+                '- `^` para XOR - NOTA: XOR tem precedência sobre OR nesse código, pois não consegui encontrar um consenso sobre isso\n'
                 "- `~` para NEGACÃO\n"\
                 "- `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.\n" \
                 "- Use <exp1> ? <exp2> para checar se exp1 é consequência lógica de exp2.\n"\
