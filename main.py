@@ -19,7 +19,7 @@ class Parser:
         self.table_rows = 0
         self.table = None
         self.table_len = 0
-        self.op_pattern = r'([+\.=>#])' #Operadores disponiveis
+        self.op_pattern = r'([+\.=>\\^])' #Operadores disponiveis
         self.linear_parenthesis_pattern = r'([^()]*)'
 
     def extract_all_parentheses(self, text):
@@ -133,7 +133,7 @@ class Parser:
                 result = (not (A)) or (B)
             case "=":  
                 result = (A == B)
-            case "#":
+            case "^":
                 result = (A ^ B)
         if(exp_negated): result = not result
         return result
@@ -150,7 +150,7 @@ class Parser:
         return token_value
     
     def tokenize_var(self, text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
-        pattern = r'[aA-zZ]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
+        pattern = r'[a-zA-Z]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
         matches = regex.findall(pattern, text, regex.VERSION1)
 
         for match in matches:
@@ -174,12 +174,7 @@ class Parser:
             for ltoken in self.tokens:
                 token = self.tokens[ltoken][0]
                 if not token in self.variable_lists:
-
-                    pattern = r'[~]{0,1}^[^+\.=>#]*[+\.=>#][^+\.=>#]*$' #Checa se a expressão é de baixa complexidade, ou seja, se ela tem apenas um operador lógico
-                    #Não usei a função pq eu havia esquecido dela KKKKKKK, se eu lembrar depois eu mudo #FIXME
-                    
-                    if(regex.match(pattern, token, regex.VERSION1) == None):
-                        
+                    if(self.is_expr_low_complexity(token)):
                         for var in last_var:
                             if(var != token and token.find(var) != -1):
                                 low_complexity = False
@@ -207,9 +202,9 @@ class Parser:
         for i in range(self.variable_amount):
             self.tokens[self.var_to_tokens[self.variable_lists[i]]][1] = self.table[line][i]   
         rexp = self.solve_exp(self.tokens[list(self.tokens.keys())[-1]][0])
-         
+       # print(self.tokens)
         return rexp
-            #print(f"Linha {i+1}: {self.table[i]} = Resultado: {rexp}")
+  
      
 
     def create_truth_table(self):
@@ -237,7 +232,7 @@ class Parser:
         print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == self.table_rows else "Contingência" if trues != 0 else "Contradição"}")
 
     def tokenize_linear_exp(self, exp):
-        for op in ['.', '#', '+', '>', '=']:
+        for op in ['^', '.' , '+', '>', '=']:
             while(op in exp and self.count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
                 matches = self.find_low_complexity_exp(exp, op) #Tenta achar o token op na exp
                 if(matches == []): break
@@ -280,11 +275,10 @@ class Parser:
         return exp
 
     def count_op(self, exp):
-        pattern = r'[+>\.=#]'
-        return len(regex.findall(pattern, exp, regex.VERSION1))
+        return len(regex.findall(self.op_pattern, exp, regex.VERSION1))
 
     def find_low_complexity_exp(self, exp, op):
-        pattern = rf'[(~a-zA-Z0-9_]+[{op}][~a-zA-Z0-9_)]+'
+        pattern = rf'[(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+'
         matches = regex.findall(pattern, exp, regex.VERSION1)
         if(matches == None): print("Expressão Invalida ", exp, "com operador", op)
         return matches
@@ -299,8 +293,8 @@ class Parser:
             self.tokenize_linear_exp(tokenized)
             parenthesis_step = (self.extract_all_parentheses(tokenized))
             if(not self.is_linear(tokenized)):
-                tokenized = self.linearize_parenthesis(parenthesis_step, tokenized)
-            self.tokens.popitem()
+                tokenized = self.linearize_parenthesis(parenthesis_step, tokenized) 
+            if(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 ): self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores, isso significa que o penultimo é a resolução real, então remove ele
     
         self.tokenize_linear_exp(tokenized)
 
