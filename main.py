@@ -211,6 +211,14 @@ class Parser:
             else:
                 self.tokens_canon_and_equivalent[token_id] =self.canonize_simple_exp_and(token)
 
+    def create_canon_or_equivalent(self):
+        for token_id in self.tokens:
+            token = self.tokens[token_id][0]
+            if(self.count_op(token) == 0 or self.get_op(token) == "+"):
+                self.tokens_canon_or_equivalent[token_id] = self.tokens[token_id][0]
+            else:
+                self.tokens_canon_or_equivalent[token_id] =self.canonize_simple_exp_or(token)
+
     def get_canon_and(self):
         self.create_canon_and_equivalent()
         expr = self.tokens_canon_and_equivalent[list(self.tokens_canon_and_equivalent.keys())[-1]]
@@ -218,6 +226,17 @@ class Parser:
             matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
             for token in matches:
                 untokenized_exp = self.tokens_canon_and_equivalent[token]
+                replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
+                expr = expr.replace(token, replace_exp)
+        return expr
+    
+    def get_canon_or(self):
+        self.create_canon_or_equivalent()
+        expr = self.tokens_canon_or_equivalent[list(self.tokens_canon_or_equivalent.keys())[-1]]
+        while(expr.find("0x") != -1):
+            matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+            for token in matches:
+                untokenized_exp = self.tokens_canon_or_equivalent[token]
                 replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
                 expr = expr.replace(token, replace_exp)
         return expr
@@ -234,7 +253,24 @@ class Parser:
                 return f"~(~{matches[0]}.{matches[1]}).~({matches[0]}.~{matches[1]})"
             case "^":
                 return f"~(~(~{matches[0]}.{matches[1]}).~({matches[0]}.~{matches[1]}))"
-        pass
+            
+        return expr
+    
+    def canonize_simple_exp_or(self, expr):
+        op = self.get_op(expr)
+        matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+        match op:
+            case ".":
+                return f"~(~{matches[0]}+~{matches[1]})"
+            case ">":
+                return f"(~{matches[0]}+{matches[1]})"
+            case "=": #¬(¬A∨¬B)∨¬(A∨B)
+                return f"~(~{matches[0]}+~{matches[1]})+~({matches[0]}+{matches[1]})"
+            case "^": #¬(A∨~B)∨¬(~A∨B)
+                return f"~({matches[0]}+~{matches[1]})+~(~{matches[0]}+{matches[1]}))"
+            
+        return expr
+    
     def recreate_exp_from_tokens(self):
         expr = self.tokens[list(self.tokens.keys())[-1]][0]
         while(expr.find("0x") != -1):
@@ -435,7 +471,8 @@ def parse_expression_input(exp):
         expr1.create_truth_table()
         expr1.parse_truth_table()
         print("Forma canônica E: " + expr1.get_canon_and())
-
+        print("Forma canônica OU: " + expr1.get_canon_or())
+        print("")
 def main():
     '''
      
