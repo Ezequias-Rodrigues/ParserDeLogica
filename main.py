@@ -17,10 +17,11 @@ class patterns:
         #- `(?R)` : refere-se à expressão regular atual, permitindo recursão para lidar com parênteses nested.
     SIMPLE_EXPRESSION_WILDCARD = r'([^*]+)\*([^*]+)' #Derivado de rf'([^{op}]+)\{op}([^{op}]+)', aceita sentenças
     FINAL_EXPRESSION_WILDCARD = r'[(~a-zA-Z0-9_]+[\*][~a-zA-Z0-9_)]+' #Derivada de [(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+, quase a mesma coisa da anterior mas só aceita proposições e não sentenças
-    CONTRADICTION = r'(?:(0x[0-9a-f]+)\.~\1)|(?:~(0x[0-9a-f]+)\.\2)' #XORzinho de praxe
-    TAUNTOLOGY =  r'(?:(0x[0-9a-f]+)\+~\1)|(?:~(0x[0-9a-f]+)\+\2)'
-    IDEMPOTENCE_OR = r'^(?:([~]{0,1}0x[0-9a-f]+)\+\1)' #Mano bicondicional de "~", isso aqui ja virou metacoding
-    IDEMPOTENCE_AND = r'^(?:([~]{0,1}0x[0-9a-f]+)\.\1)'
+    CONTRADICTION = r'([(]{0,1}(?<!~)([^~.]+)\.~\2[)]{0,1}|[(]{0,1}~([^~.]+)\.\3(?!\.~)[)]{0,1})' #XORzinho de praxe
+    TAUNTOLOGY =  r'([(]{0,1}(?<!~)([^~+]+)\+~\2[)]{0,1}|[(]{0,1}~([^~+]+)\+\3(?!\+~)[)]{0,1})'
+    IDEMPOTENCE_OR = r'^(?:([~]{0,1}.+)\+\1)' #Mano bicondicional de "~", isso aqui ja virou metacoding
+    IDEMPOTENCE_AND = r'^(?:([~]{0,1}.+)\.\1)'
+    ABSOPTION_OR = "" #Notch's apple?
 class Parser:
     def __init__(self):
         self.token_count = 0
@@ -92,6 +93,7 @@ class Parser:
             if(is_token):
                 ret = self.solve_exp(self.tokens[expr][0])
             elif(is_exp):
+                
                 ret = self.tokens[self.var_to_tokens[expr]][1]
             elif(is_variable):
                 ret = self.tokens[self.var_to_tokens[expr]][1]
@@ -167,7 +169,6 @@ class Parser:
     
     def tokenize_var(self, text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
         matches = regex.findall(patterns.PROPOSITIONS, text, regex.VERSION1)
-
         for match in matches:
             if not match in self.variable_lists: #Evitar de tokenizar a mesma variável mais de uma vez
                 
@@ -272,27 +273,36 @@ class Parser:
             matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
             for token in matches:
                 untokenized_exp = self.tokens[token][0]
-                replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
+                replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"                
                 expr = expr.replace(token, replace_exp)
-        return expr
 
-    def simplify_tokens(self): #O uso de regex aqui vai ser intenso.... contemplem o primeiro algoritmo O(n^^2)(n tetration 2)
-        for token_id in self.tokens:
-            token = self.tokens[token_id][0]
-            if(self.count_op(token) > 0):
-                simplifiable = regex.match(patterns.CONTRADICTION, token, regex.VERSION1) #Vamos ver se da pra simplificar por contradição, vo tentar deixar os nomes dos padrões (primeiro argumento) claros pra evitar 1 trilhão de comentarios
-                if(simplifiable):
-                    self.tokens_simplified[token_id] = "False"
-                    continue #Não tem mais por que continuar a comparação, ent continuaremos o loop
-                simplifiable = regex.match(patterns.TAUNTOLOGY, token, regex.VERSION1)
-                if(simplifiable):
-                    self.tokens_simplified[token_id] = "True"
-                simplifiable = regex.findall(patterns.IDEMPOTENCE_AND, token, regex.VERSION1) #Já que em python qualquer valor que não seja None, 0 ou False(E possivelmente []) é true, da pra usar só o findall como match e findall
-                if(simplifiable):
-                    self.tokens_simplified[token_id] = simplifiable[0]
-                simplifiable = regex.findall(patterns.IDEMPOTENCE_OR, token, regex.VERSION1) 
-                if(simplifiable):
-                    self.tokens_simplified[token_id] = simplifiable[0]
+        return expr
+        
+
+    def simplify_expression(self, expr): #O uso de regex aqui vai ser intenso.... contemplem o primeiro algoritmo O(n^^2)(n tetration 2)
+        
+        if(self.count_op(expr) > 0):
+            simplifiable = regex.findall(patterns.CONTRADICTION, expr, regex.VERSION1) #Vamos ver se da pra simplificar por contradição, vo tentar deixar os nomes dos padrões (primeiro argumento) claros pra evitar 1 trilhão de comentarios
+          
+            if(simplifiable):#No meu entendimento, em uma regex com multiplos capturing groups, o primeiro elemento(0, porem [0][0] pq é uma lista de tuplas) é o primeiro grupo(wow lógica complexa, eu sei)
+                simplifieer = simplifiable[0][0]
+                expr = expr.replace(simplifieer, "FALSE")
+            
+            simplifiable = regex.findall(patterns.TAUNTOLOGY, expr, regex.VERSION1)
+            print(simplifiable)
+            if(simplifiable):
+                simplifieer = simplifiable[0][0]
+                expr = expr.replace(simplifieer, "TRUE")
+                #self.tokens_simplified[token_id] = "True"
+            simplifiable = regex.findall(patterns.IDEMPOTENCE_AND, expr, regex.VERSION1) #Já que em python qualquer valor que não seja None, 0 ou False(E possivelmente []) é true, da pra usar só o findall como match e findall
+            if(simplifiable):
+                print("3", simplifiable)
+                #self.tokens_simplified[token_id] = simplifiable[0]
+            simplifiable = regex.findall(patterns.IDEMPOTENCE_OR, expr, regex.VERSION1) 
+            if(simplifiable):
+                print("4", simplifiable)
+        print(expr)
+               # self.tokens_simplified[token_id] = simplifiable[0]
                 #Depois que eu terminar de codar, e ver como vai ficar, talvez eu ponha em um loop for que itere por uma lista com todas as regras para evitar ficar repetindo código
                 #Afinal, linhas são caras...
     def parse_truth_table_line(self, line):
@@ -324,17 +334,22 @@ class Parser:
             trues = trues + 1 if line else trues 
             #print(tokens)
             print(f"Linha {i+1}: {self.table[i]} = Resultado: {line}")
-        
+
+        recreated = self.recreate_exp_from_tokens()
+        self.simplify_expression(recreated)
         print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == self.table_rows else "Contingência" if trues != 0 else "Contradição"}")
-        print("\n[Depuração] Como a expressão foi entendida", self.recreate_exp_from_tokens())
+        print("\n[Depuração] Como a expressão foi entendida", recreated)
     
     def tokenize_linear_exp(self, exp):
+      
         for op in [ '.', '^' , '+', '>', '=']:
             while(op in exp and self.count_op(exp) > 1): #Itera o processo abaixo na exp até que só sobre um unico operador, oq indica que ela ta na forma final
                 matches = self.find_low_complexity_exp(exp, op) #Tenta achar o token op na exp
+                print(matches, " aaa")
                 if(matches == []): break
                 exp = self.replace_in_exp(exp, matches)#Simplifica a exp, e adiciona tokens para poder ser "desimplificada" posteriormente
         self.add_token(exp)
+
         return exp
 
     def linearize_parenthesis(self, extracted, matches):
@@ -342,11 +357,13 @@ class Parser:
         if(extracted == []): return matches #O que não tem remédio, remediado está
         outer = extracted[-1] #Guarda o valor do ultimo index, que deve ser o mais complexo depois do sort
         final_exp = "" #Essa vai ser a expressão final depois de convertida
-        
+        print(extracted)
         while(len(extracted) > 0):
+        
             exp = extracted[0][1:-1] #Remove os parenteses iniciais para começar
             del extracted[0] #Tira da list para simplificar o loop
             exp = self.tokenize_linear_exp(exp)
+
             self.add_token(exp)
             final_exp = exp
             token = final_exp
@@ -356,7 +373,7 @@ class Parser:
                 extracted[i] =  extracted[i].replace("("+exp+")", token)   
     
         matches = matches.replace(outer, token)
-
+        print(matches)
         return matches
 
     def is_linear(self, exp):
@@ -386,18 +403,15 @@ class Parser:
     def solve(self, text):
         tokenized = self.tokenize_var(text)
         parenthesis_step = self.extract_all_parentheses(tokenized) if tokenized.count("(") > 0 else []
-        
+        parenthesis_step = list(dict.fromkeys(parenthesis_step))#A lógica aqui é q as chaves de dicionarios não se repetem, ent caso haja repetição ela será removida
+        #Python definitivamente é uma linguagem....
         while(not self.is_linear(tokenized)):
         
             tokenized = self.linearize_parenthesis(parenthesis_step, tokenized)
             self.tokenize_linear_exp(tokenized)
-            parenthesis_step = (self.extract_all_parentheses(tokenized))
+            parenthesis_step = list(dict.fromkeys((self.extract_all_parentheses(tokenized))))
             if(not self.is_linear(tokenized)):
                 tokenized = self.linearize_parenthesis(parenthesis_step, tokenized) 
-           # 
-           # while(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 and
-               # self.tokens[list(self.tokens.keys())[-1]][0].find("~") == -1 ): 
-                #self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores E não negada, isso significa que o penultimo é a resolução real, então remove ele
         self.tokenize_linear_exp(tokenized)
         
 
@@ -494,7 +508,7 @@ def parse_expression_input(exp):
         expr1.create_truth_table()
         expr1.parse_truth_table()
         print(expr1.tokens)
-        expr1.simplify_tokens()
+        
         print("Forma canônica E: " + expr1.get_canon(expr1.tokens_canon_and_equivalent, "."))
         print("Forma canônica OU: " + expr1.get_canon(expr1.tokens_canon_or_equivalent, "+"))
         print( "\n", expr1.tokens_canon_and_equivalent, "\n", expr1.tokens_canon_or_equivalent, "\n", expr1.tokens_simplified)
@@ -506,7 +520,9 @@ def main():
     #parse_expression_input("~(((a)))")
     #parse_expression_input("c.((((a+b))))")
     #parse_expression_input("(p>q).(p>~q)")
-    parse_expression_input("(p.p)")
+    #parse_expression_input("a.~a")
+    parse_expression_input("((a+~a)+(a+~a))+a")
+   # parse_expression_input("a+(a.b)>a")
     #parse_expression_input("False+(False+True)>False")
     while(0):
      
