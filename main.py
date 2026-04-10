@@ -17,7 +17,7 @@ class patterns:
         #- `(?R)` : refere-se à expressão regular atual, permitindo recursão para lidar com parênteses nested.
     SIMPLE_EXPRESSION_WILDCARD = r'([^*]+)\*([^*]+)' #Derivado de rf'([^{op}]+)\{op}([^{op}]+)', aceita sentenças
     FINAL_EXPRESSION_WILDCARD = r'[(~a-zA-Z0-9_]+[\*][~a-zA-Z0-9_)]+' #Derivada de [(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+, quase a mesma coisa da anterior mas só aceita proposições e não sentenças
-    
+    CONTRADICTION = r'(?:(0x[0-9a-f]+)\.~\1)|(?:~(0x[0-9a-f]+)\.\2)' #XORzinho de praxe
 class Parser:
     def __init__(self):
         self.token_count = 0
@@ -52,7 +52,7 @@ class Parser:
     def extract_op(self, text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
         exclude_keys = list(self.tokens.keys())
         #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
-        exclude_keys.append('').append('(').append(')')#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
+        exclude_keys = exclude_keys + ["", " ", "(", ")"]#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
         if result == None:
             result = []
         if(r2l): matches = text.split(op,1)
@@ -236,12 +236,12 @@ class Parser:
                 return f"~(~{matches[0]}.{matches[1]}).~({matches[0]}.~{matches[1]})"
             case "^":
                 return f"~(~(~{matches[0]}.{matches[1]}).~({matches[0]}.~{matches[1]}))"
-            
+
         return expr
     
     def canonize_simple_exp_or(self, expr):
         op = self.get_op(expr)
-        matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
+        matches = regex.findall(patterns.NEGATED_TOKENS, expr, regex.VERSION1)
         match op:
             case ".":
                 return f"~(~{matches[0]}+~{matches[1]})"
@@ -264,6 +264,12 @@ class Parser:
                 expr = expr.replace(token, replace_exp)
         return expr
 
+    def simplify_tokens(self):
+        for token_id in self.tokens:
+            token = self.tokens[token_id][0]
+            if(self.count_op(token) > 0):
+                print(token)
+            
     def parse_truth_table_line(self, line):
         for i in range(self.variable_amount):
             self.tokens[self.var_to_tokens[self.variable_lists[i]]][1] = self.table[line][i]   
@@ -463,6 +469,7 @@ def parse_expression_input(exp):
         expr1.create_truth_table()
         expr1.parse_truth_table()
         print(expr1.tokens)
+        expr1.simplify_tokens()
         print("Forma canônica E: " + expr1.get_canon(expr1.tokens_canon_and_equivalent, "."))
         print("Forma canônica OU: " + expr1.get_canon(expr1.tokens_canon_or_equivalent, "+"))
         print( "\n", expr1.tokens_canon_and_equivalent, "\n", expr1.tokens_canon_or_equivalent, "\n", expr1.tokens_simplified)
