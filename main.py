@@ -18,6 +18,9 @@ class patterns:
     SIMPLE_EXPRESSION_WILDCARD = r'([^*]+)\*([^*]+)' #Derivado de rf'([^{op}]+)\{op}([^{op}]+)', aceita sentenças
     FINAL_EXPRESSION_WILDCARD = r'[(~a-zA-Z0-9_]+[\*][~a-zA-Z0-9_)]+' #Derivada de [(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+, quase a mesma coisa da anterior mas só aceita proposições e não sentenças
     CONTRADICTION = r'(?:(0x[0-9a-f]+)\.~\1)|(?:~(0x[0-9a-f]+)\.\2)' #XORzinho de praxe
+    TAUNTOLOGY =  r'(?:(0x[0-9a-f]+)\+~\1)|(?:~(0x[0-9a-f]+)\+\2)'
+    IDEMPOTENCE_OR = r'^(?:([~]{0,1}0x[0-9a-f]+)\+\1)' #Mano bicondicional de "~", isso aqui ja virou metacoding
+    IDEMPOTENCE_AND = r'^(?:([~]{0,1}0x[0-9a-f]+)\.\1)'
 class Parser:
     def __init__(self):
         self.token_count = 0
@@ -278,12 +281,20 @@ class Parser:
             token = self.tokens[token_id][0]
             if(self.count_op(token) > 0):
                 simplifiable = regex.match(patterns.CONTRADICTION, token, regex.VERSION1) #Vamos ver se da pra simplificar por contradição, vo tentar deixar os nomes dos padrões (primeiro argumento) claros pra evitar 1 trilhão de comentarios
-                matches = []
                 if(simplifiable):
-                    matches = regex.match(patterns.TOKENS, token, regex.VERSION1)[0] #Como a expresão é A.~A(ou ~A.A) qualquer valor dentro dessa lista é o mesmo, então vamos usar o 0
                     self.tokens_simplified[token_id] = "False"
-                print(simplifiable)
-            
+                    continue #Não tem mais por que continuar a comparação, ent continuaremos o loop
+                simplifiable = regex.match(patterns.TAUNTOLOGY, token, regex.VERSION1)
+                if(simplifiable):
+                    self.tokens_simplified[token_id] = "True"
+                simplifiable = regex.findall(patterns.IDEMPOTENCE_AND, token, regex.VERSION1) #Já que em python qualquer valor que não seja None, 0 ou False(E possivelmente []) é true, da pra usar só o findall como match e findall
+                if(simplifiable):
+                    self.tokens_simplified[token_id] = simplifiable[0]
+                simplifiable = regex.findall(patterns.IDEMPOTENCE_OR, token, regex.VERSION1) 
+                if(simplifiable):
+                    self.tokens_simplified[token_id] = simplifiable[0]
+                #Depois que eu terminar de codar, e ver como vai ficar, talvez eu ponha em um loop for que itere por uma lista com todas as regras para evitar ficar repetindo código
+                #Afinal, linhas são caras...
     def parse_truth_table_line(self, line):
         for i in range(self.variable_amount):
             self.tokens[self.var_to_tokens[self.variable_lists[i]]][1] = self.table[line][i]   
@@ -495,9 +506,9 @@ def main():
     #parse_expression_input("~(((a)))")
     #parse_expression_input("c.((((a+b))))")
     #parse_expression_input("(p>q).(p>~q)")
-    #parse_expression_input("(p.~p)")
+    parse_expression_input("(p.p)")
     #parse_expression_input("False+(False+True)>False")
-    while(1):
+    while(0):
      
 
             print(
