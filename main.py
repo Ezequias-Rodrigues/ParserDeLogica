@@ -108,19 +108,28 @@ class Parser:
         
         A = self.tokens[matches[0]][0]
         B = self.tokens[matches[1]][0]
-    
-        if(A in self.variable_lists):
+
+        if(A.lower() == "false"):
+            A = False
+        elif (A.lower() == "true"): #Isso aqui é cursed d+
+            A = True
+        elif(A in self.variable_lists):
             A = self.tokens[self.var_to_tokens[A]][1]
         else:
             A = self.solve_exp(A)
-        if(B in self.variable_lists):
+
+        if(B.lower() == "false"):
+            B = False
+        elif (B.lower() == "true"): #Isso aqui é cursed d+
+            B = True
+        elif(B in self.variable_lists):
             B = self.tokens[self.var_to_tokens[B]][1]
         else:
             B = self.solve_exp(B)
 
         if(not mult[0]):A = not A
         if(not mult[1]):B = not B
-        
+      
         result = None
         match op:
             case ".":
@@ -264,11 +273,16 @@ class Parser:
                 expr = expr.replace(token, replace_exp)
         return expr
 
-    def simplify_tokens(self):
+    def simplify_tokens(self): #O uso de regex aqui vai ser intenso.... contemplem o primeiro algoritmo O(n^^2)(n tetration 2)
         for token_id in self.tokens:
             token = self.tokens[token_id][0]
             if(self.count_op(token) > 0):
-                print(token)
+                simplifiable = regex.match(patterns.CONTRADICTION, token, regex.VERSION1) #Vamos ver se da pra simplificar por contradição, vo tentar deixar os nomes dos padrões (primeiro argumento) claros pra evitar 1 trilhão de comentarios
+                matches = []
+                if(simplifiable):
+                    matches = regex.match(patterns.TOKENS, token, regex.VERSION1)[0] #Como a expresão é A.~A(ou ~A.A) qualquer valor dentro dessa lista é o mesmo, então vamos usar o 0
+                    self.tokens_simplified[token_id] = "False"
+                print(simplifiable)
             
     def parse_truth_table_line(self, line):
         for i in range(self.variable_amount):
@@ -481,8 +495,9 @@ def main():
     #parse_expression_input("~(((a)))")
     #parse_expression_input("c.((((a+b))))")
     #parse_expression_input("(p>q).(p>~q)")
-    parse_expression_input("(p.~p)")
-    while(0):
+    #parse_expression_input("(p.~p)")
+    #parse_expression_input("False+(False+True)>False")
+    while(1):
      
 
             print(
