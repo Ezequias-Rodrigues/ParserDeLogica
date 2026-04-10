@@ -1,11 +1,14 @@
 import regex
 class patterns:
     PROPOSITIONS = r'[a-zA-Z0-9]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes'[a-zA-Z0-9]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
+    NEGATED_PROPOSITIONS = r'[~a-zA-Z0-9]+'
     TOKENS =  r'(0x\d+)'
     NEGATED_TOKENS =  r'([~]{0,1}0x\d+)'
     OPERATOR = r'([+\.=>^])'
     PARENTHESIS = r'([^()]*)'
+    DOUBLE_NEGATION = r'(~~[a-zA-Z0-9]+)'
     RECURSIVE_PARENTHESIS = r'\((?:[^()]|(?R))*\)'
+    LINEAR_PARENTHESIS = r'\([^()]+\)'
         #Esse padrão vai ser para criar "tokens" de expressões lógicas que estejam delimitada por parênteses, mais a frente será criado uma maneira de lidar com as outras expressões
         #seguindo o a regra de precedência.
         #Explicação do padrão:
@@ -19,9 +22,10 @@ class patterns:
     FINAL_EXPRESSION_WILDCARD = r'[(~a-zA-Z0-9_]+[\*][~a-zA-Z0-9_)]+' #Derivada de [(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+, quase a mesma coisa da anterior mas só aceita proposições e não sentenças
     CONTRADICTION = r'([(]{0,1}(?<!~)([^~.]+)\.~\2[)]{0,1}|[(]{0,1}~([^~.]+)\.\3(?!\.~)[)]{0,1})' #XORzinho de praxe
     TAUNTOLOGY =  r'([(]{0,1}(?<!~)([^~+]+)\+~\2[)]{0,1}|[(]{0,1}~([^~+]+)\+\3(?!\+~)[)]{0,1})'
-    IDEMPOTENCE_OR = r'^(?:([~]{0,1}.+)\+\1)' #Mano bicondicional de "~", isso aqui ja virou metacoding
-    IDEMPOTENCE_AND = r'^(?:([~]{0,1}.+)\.\1)'
+    IDEMPOTENCE_OR = r'([(]{0,1}(?:([~]{0,1}\w+)\+\2)[)]{0,1})' #Mano bicondicional de "~", isso aqui ja virou metacoding
+    IDEMPOTENCE_AND = r'([(]{0,1}(?:([~]{0,1}\w+)\.\2)[)]{0,1})' #Vou deixar a idepotencia de lado por um tempo pq parando pra pensar, o jeito mais facil de implementar que eu consigo ver, envolve a forma canonica, que é meio cedo pra lidar agr
     ABSOPTION_OR = "" #Notch's apple?
+    PARENTHESIS_SINGLE_VARIABLE = r'\([^()]\w+\)'
 class Parser:
     def __init__(self):
         self.token_count = 0
@@ -229,6 +233,7 @@ class Parser:
     def get_canon(self, from_tokens, operator):
         self.create_canon_equivalence(from_tokens, operator)
         expr = from_tokens[list(from_tokens.keys())[-1]]
+        
         while(expr.find("0x") != -1):
             matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
             for token in matches:
@@ -237,6 +242,19 @@ class Parser:
                 expr = expr.replace(token, replace_exp)
         return expr
     
+    def get_disjunctive(self):
+        expr = self.tokens_canon_or_equivalent[list(self.tokens_canon_or_equivalent.keys())[-1]]
+        sides = expr.split("+")
+        
+        for i in range(0 ,len(sides)):
+            while(sides[i].find("0x") != -1):
+                matches = regex.findall(patterns.TOKENS, sides[i], regex.VERSION1)
+                for token in matches:
+                    untokenized_exp = self.tokens_canon_and_equivalent[token] #SIM, AND.
+                    replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
+                    sides[i] = sides[i].replace(token, replace_exp)
+            sides[i] = self.simplify_expression(sides[i])
+        return self.simplify_expression(f'{sides[0]}+{sides[1]}')
     def canonize_simple_exp_and(self, expr):
         op = self.get_op(expr)
         matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
@@ -280,29 +298,56 @@ class Parser:
         
 
     def simplify_expression(self, expr): #O uso de regex aqui vai ser intenso.... contemplem o primeiro algoritmo O(n^^2)(n tetration 2)
+        steps = 0
+        one_more_step = True
+        while(one_more_step):
+            steps += 1
         
-        if(self.count_op(expr) > 0):
-            simplifiable = regex.findall(patterns.CONTRADICTION, expr, regex.VERSION1) #Vamos ver se da pra simplificar por contradição, vo tentar deixar os nomes dos padrões (primeiro argumento) claros pra evitar 1 trilhão de comentarios
-          
-            if(simplifiable):#No meu entendimento, em uma regex com multiplos capturing groups, o primeiro elemento(0, porem [0][0] pq é uma lista de tuplas) é o primeiro grupo(wow lógica complexa, eu sei)
-                simplifieer = simplifiable[0][0]
-                expr = expr.replace(simplifieer, "FALSE")
+            one_more_step = False
+            if(self.count_op(expr) > 0):
+                simplifiable = regex.findall(patterns.CONTRADICTION, expr, regex.VERSION1) #Vamos ver se da pra simplificar por contradição, vo tentar deixar os nomes dos padrões (primeiro argumento) claros pra evitar 1 trilhão de comentarios
             
-            simplifiable = regex.findall(patterns.TAUNTOLOGY, expr, regex.VERSION1)
-            print(simplifiable)
-            if(simplifiable):
-                simplifieer = simplifiable[0][0]
-                expr = expr.replace(simplifieer, "TRUE")
-                #self.tokens_simplified[token_id] = "True"
-            simplifiable = regex.findall(patterns.IDEMPOTENCE_AND, expr, regex.VERSION1) #Já que em python qualquer valor que não seja None, 0 ou False(E possivelmente []) é true, da pra usar só o findall como match e findall
-            if(simplifiable):
-                print("3", simplifiable)
-                #self.tokens_simplified[token_id] = simplifiable[0]
-            simplifiable = regex.findall(patterns.IDEMPOTENCE_OR, expr, regex.VERSION1) 
-            if(simplifiable):
-                print("4", simplifiable)
-        print(expr)
-               # self.tokens_simplified[token_id] = simplifiable[0]
+                if(simplifiable):#No meu entendimento, em uma regex com multiplos capturing groups, o primeiro elemento(0, porem [0][0] pq é uma lista de tuplas) é o primeiro grupo(wow lógica complexa, eu sei)
+                    simplifieer = simplifiable[0][0]
+                    expr = expr.replace(simplifieer, "FALSE")
+                    one_more_step = True
+
+                simplifiable = regex.findall(patterns.TAUNTOLOGY, expr, regex.VERSION1)
+                if(simplifiable):
+                    simplifieer = simplifiable[0][0]
+                    expr = expr.replace(simplifieer, "TRUE")
+                    one_more_step = True
+
+                simplifiable = regex.findall(patterns.IDEMPOTENCE_AND, expr, regex.VERSION1) #Já que em python qualquer valor que não seja None, 0 ou False(E possivelmente []) é true, da pra usar só o findall como match e findall
+                if(simplifiable):
+                    simplifieer = simplifiable[0][0]
+                    proposition = regex.findall(patterns.NEGATED_PROPOSITIONS, simplifieer, regex.VERSION1)[0]
+                    expr = expr.replace(simplifieer, proposition)
+                    one_more_step = True
+
+                simplifiable = regex.findall(patterns.IDEMPOTENCE_OR, expr, regex.VERSION1) 
+                if(simplifiable):
+                    simplifieer = simplifiable[0][0]
+                    proposition = regex.findall(patterns.NEGATED_PROPOSITIONS, simplifieer, regex.VERSION1)[0]
+                    expr = expr.replace(simplifieer, proposition)
+                    one_more_step = True
+
+                simplifiable = regex.findall(patterns.DOUBLE_NEGATION, expr, regex.VERSION1)
+                if(simplifiable):
+                    simplifieer = simplifiable[0]
+                    proposition = regex.findall(patterns.PROPOSITIONS, simplifieer, regex.VERSION1)[0]
+                    expr = expr.replace(simplifieer, proposition)
+                    one_more_step = True
+
+                simplifiable = regex.findall(patterns.PARENTHESIS_SINGLE_VARIABLE, expr, regex.VERSION1)
+                if(simplifiable):
+                    simplifieer = simplifiable[0]
+                    sentence = simplifieer[1:-1] #Corta os parenteses
+                    expr = expr.replace(simplifieer, sentence)
+                    one_more_step = True
+                    
+        return expr
+
                 #Depois que eu terminar de codar, e ver como vai ficar, talvez eu ponha em um loop for que itere por uma lista com todas as regras para evitar ficar repetindo código
                 #Afinal, linhas são caras...
     def parse_truth_table_line(self, line):
@@ -336,10 +381,10 @@ class Parser:
             print(f"Linha {i+1}: {self.table[i]} = Resultado: {line}")
 
         recreated = self.recreate_exp_from_tokens()
-        self.simplify_expression(recreated)
+        #self.simplify_expression(recreated)
         print(f"\nEssa tabela apresenta uma: {"Tauntologia" if trues == self.table_rows else "Contingência" if trues != 0 else "Contradição"}")
         print("\n[Depuração] Como a expressão foi entendida", recreated)
-    
+       
     def tokenize_linear_exp(self, exp):
       
         for op in [ '.', '^' , '+', '>', '=']:
@@ -357,13 +402,10 @@ class Parser:
         if(extracted == []): return matches #O que não tem remédio, remediado está
         outer = extracted[-1] #Guarda o valor do ultimo index, que deve ser o mais complexo depois do sort
         final_exp = "" #Essa vai ser a expressão final depois de convertida
-        print(extracted)
         while(len(extracted) > 0):
-        
             exp = extracted[0][1:-1] #Remove os parenteses iniciais para começar
             del extracted[0] #Tira da list para simplificar o loop
             exp = self.tokenize_linear_exp(exp)
-
             self.add_token(exp)
             final_exp = exp
             token = final_exp
@@ -371,9 +413,7 @@ class Parser:
                 token = self.var_to_tokens[token]
             for i in range(len(extracted)):
                 extracted[i] =  extracted[i].replace("("+exp+")", token)   
-    
         matches = matches.replace(outer, token)
-        print(matches)
         return matches
 
     def is_linear(self, exp):
@@ -507,11 +547,12 @@ def parse_expression_input(exp):
         expr1.solve(exp)
         expr1.create_truth_table()
         expr1.parse_truth_table()
-        print(expr1.tokens)
+
         
         print("Forma canônica E: " + expr1.get_canon(expr1.tokens_canon_and_equivalent, "."))
         print("Forma canônica OU: " + expr1.get_canon(expr1.tokens_canon_or_equivalent, "+"))
-        print( "\n", expr1.tokens_canon_and_equivalent, "\n", expr1.tokens_canon_or_equivalent, "\n", expr1.tokens_simplified)
+
+        print("Simplificada para:", expr1.get_disjunctive())
 def main():
     '''
      
@@ -521,8 +562,9 @@ def main():
     #parse_expression_input("c.((((a+b))))")
     #parse_expression_input("(p>q).(p>~q)")
     #parse_expression_input("a.~a")
-    parse_expression_input("((a+~a)+(a+~a))+a")
-   # parse_expression_input("a+(a.b)>a")
+    #parse_expression_input("((a+~a)+(a+~a))+a")
+    #parse_expression_input("c.a+(a.b)")
+    parse_expression_input("~(a+b)+c")
     #parse_expression_input("False+(False+True)>False")
     while(0):
      
