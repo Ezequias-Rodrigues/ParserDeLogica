@@ -1,39 +1,11 @@
 import regex
-class Parser:
-    '''
-    Simbolos que pretendo usar:
-    - `.` para AND
-    - `^` para XOR 
-    - `+` para OR
-    - `>` para IMPLICAÇÃO
-    - `=` para BICONDICIONAL
-    - `~` para NEGACÃO
-    - `(` e `)` para delimitar expressões, não são obrigatórios, mas ajudam a definir a precedência das operações.
-    '''
-    def __init__(self):
-        self.token_count = 0
-        self.tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
-        self.tokens_canon_and_equivalent = {}
-        self.tokens_canon_or_equivalent = {}
-        self.var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
-        self.variable_lists = []
-        self.variable_amount = 0
-        self.table_rows = 0
-        self.table = None
-        self.table_len = 0
-        self.op_pattern = r'([+\.=>^])' #Operadores disponiveis
-        self.token_pattern = r'(0x\d+)'
-        self.linear_parenthesis_pattern = r'([^()]*)'
-
-    def extract_all_parentheses(self, text):
-        
-        #Não pretendo limitar a profundidade do nesting,
-        #fui atrás de uma biblioteca que suporta recursão em regex, e encontrei a 'regex' que é uma extensão da biblioteca 're' do Python.
-        #Ela permite usar a sintaxe (?R) para referenciar a expressão regular atual, o que é útil para lidar com estruturas nested como parênteses.
-        
-        result = []
-        pattern = r'\((?:[^()]|(?R))*\)'
-        
+class patterns:
+    PROPOSITIONS = r'[a-zA-Z0-9]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes'[a-zA-Z0-9]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
+    TOKENS =  r'(0x\d+)'
+    NEGATED_TOKENS =  r'([~]{0,1}0x\d+)'
+    OPERATOR = r'([+\.=>^])'
+    PARENTHESIS = r'([^()]*)'
+    RECURSIVE_PARENTHESIS = r'\((?:[^()]|(?R))*\)'
         #Esse padrão vai ser para criar "tokens" de expressões lógicas que estejam delimitada por parênteses, mais a frente será criado uma maneira de lidar com as outras expressões
         #seguindo o a regra de precedência.
         #Explicação do padrão:
@@ -43,8 +15,32 @@ class Parser:
         #- `[^()]` : corresponde a qualquer caractere que não seja um parêntese. Isso garante que o regex possa lidar com texto dentro dos parênteses sem se confundir com os parênteses de abertura e fechamento.
         #- `|` : operador "or" para alternar entre os caracteres que não são parênteses e a recursão.
         #- `(?R)` : refere-se à expressão regular atual, permitindo recursão para lidar com parênteses nested.
+    SIMPLE_EXPRESSION_WILDCARD = r'([^*]+)\*([^*]+)' #Derivado de rf'([^{op}]+)\{op}([^{op}]+)', aceita sentenças
+    FINAL_EXPRESSION_WILDCARD = r'[(~a-zA-Z0-9_]+[\*][~a-zA-Z0-9_)]+' #Derivada de [(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+, quase a mesma coisa da anterior mas só aceita proposições e não sentenças
+    
+class Parser:
+    def __init__(self):
+        self.token_count = 0
+        self.tokens = {}  #tokens[VALOR HEX do token_count] = [VALOR ORIGINAL, Valor boolean no momento]
+        self.tokens_canon_and_equivalent = {}
+        self.tokens_canon_or_equivalent = {}
+        self.tokens_simplified = {}
+        self.var_to_tokens =  {} #Dicionario para mapear variáveis para seus tokens correspondentes, var_to_tokens[variável] = token
+        self.variable_lists = []
+        self.variable_amount = 0
+        self.table_rows = 0
+        self.table = None
+        self.table_len = 0
+
+
+    def extract_all_parentheses(self, text):
         
-        matches = regex.findall(pattern, text, regex.VERSION1)
+        #Não pretendo limitar a profundidade do nesting,
+        #fui atrás de uma biblioteca que suporta recursão em regex, e encontrei a 'regex' que é uma extensão da biblioteca 're' do Python.
+        #Ela permite usar a sintaxe (?R) para referenciar a expressão regular atual, o que é útil para lidar com estruturas nested como parênteses.
+        
+        result = []
+        matches = regex.findall(patterns.RECURSIVE_PARENTHESIS, text, regex.VERSION1)
         for match in matches:
             result.append(match)
             inner = self.extract_all_parentheses(match[1:-1]) # Remove os parênteses externos antes de chamar recursivamente
@@ -55,9 +51,8 @@ class Parser:
     #Fora os parenteses, vou implementar a tokenização das expressões da de menor precedencia para a de maior, pq no caso dos parenteses, isso já é implicitamente resolvido
     def extract_op(self, text, op, r2l = True , result = None): #r2l = right to left, ou seja, se for True, a função vai extrair da direita para a esquerda, se não, da esquerda para a direita. Isso é necessário porque a maioria dos operadores lógicos tem associatividade à direita, ou seja, eles agrupam da direita para a esquerda.
         exclude_keys = list(self.tokens.keys())
-        exclude_keys.append('') #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
-        exclude_keys.append('(')
-        exclude_keys.append(')')#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
+        #Alguns splits podem ocasionar uma match vazia, oq é problematico pro tokenizador
+        exclude_keys.append('').append('(').append(')')#As vezes um parenteses sozinho passa, idealmente eu deveria ir atrás do por quê, porém resolver aqui não afeta a funcionalidade do código
         if result == None:
             result = []
         if(r2l): matches = text.split(op,1)
@@ -78,26 +73,29 @@ class Parser:
 
     def solve_exp(self, expr): #Eu acredito que qualquer expressão lógica pode ser resumida em uma expressão de duas variaveis e um operador, por que no final ela sempre é ou True ou False
         if(type(expr) is bool): return expr
-      
-        expr = expr.replace("~~", "") #Isso aqui deve lidar com a dupla negação. Existem técnicas para distribuir a negação para as expressões, e as vezes, fazendo na mão, a dupla negação é util, mas nesse algoritmo isso não faz diferença
+        while(expr.find("~~") != -1):
+            expr = expr.replace("~~", "") #Isso aqui deve lidar com a dupla negação. Existem técnicas para distribuir a negação para as expressões, e as vezes, fazendo na mão, a dupla negação é util, mas nesse algoritmo isso não faz diferença
         exp_negated = expr.find("~(") != -1 #Aqui vai chegar sempre expressão simples, se tiver um ~( SEMPRE vai significar que ela é o inverso
-        
         expr = expr.replace("~(", "").replace("(", "").replace(")","") #Se chegou até aqui, é pq n precisa de parenteses
         op = self.get_op(expr)
-        
 
         if(op == None): #Sem operador = resolvido
-            if(expr.find("~") != 1): #Tokens sem operadores também podem ser negados, ex: (~a)
-                expr = expr.replace("~", "")
-                return (not self.solve_exp(self.tokens[expr][0]) if expr in self.tokens.keys()
-                         else not self.tokens[self.var_to_tokens[expr]] if expr in self.var_to_tokens.keys()
-                           else None) if not expr in self.variable_lists else not self.tokens[self.var_to_tokens[expr]][1] #Digno de postar no r/programminghorror
-            return (self.solve_exp(self.tokens[expr][0]) if expr in self.tokens.keys()
-                     else self.tokens[self.var_to_tokens[expr]] if expr in self.var_to_tokens.keys()
-                       else None) if not expr in self.variable_lists else self.tokens[self.var_to_tokens[expr]][1] #Sono faz a gente fazer coisas incriveis...
-
-        pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
-        matches = list(regex.findall(pattern, expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
+            afirmative = (expr.find("~") == -1)
+            if(not afirmative): expr = expr.replace("~", "")
+            is_token = expr in self.tokens.keys()
+            is_exp =   expr in self.var_to_tokens.keys()
+            is_variable = expr in self.variable_lists
+            ret = None
+            if(is_token):
+                ret = self.solve_exp(self.tokens[expr][0])
+            elif(is_exp):
+                ret = self.tokens[self.var_to_tokens[expr]][1]
+            elif(is_variable):
+                ret = self.tokens[self.var_to_tokens[expr]][1]
+            if(not afirmative and ret != None): ret = not ret
+            return ret
+        
+        matches = list(regex.findall(patterns.SIMPLE_EXPRESSION_WILDCARD.replace("*", op), expr, regex.VERSION1)[0]) #Convertendo para lista pq é mais facil de trabalhar com elas doq com tuples
         #Aqui vou ter que criar um jeito para lidar com negações
         mult = [True, True]
         
@@ -139,11 +137,14 @@ class Parser:
         return result
     
     def add_token(self, match):
+
         if(match in self.var_to_tokens): return self.var_to_tokens[match]
+        if(match in self.tokens): return match
 
         if(self.count_op(match) == 0):
             match = match.replace("(", "").replace(")","") #Só para garantir que nenhum parenteses vai passar daqui aleatoriamente
-        match = match.replace("~~", "") #Lidando com dupla negação aqui também, pois dupla negação com parenteses não é pega na proxima etapa
+        while(match.find("~~") != -1):
+            match = match.replace("~~", "") #Lidando com dupla negação aqui também, pois dupla negação com parenteses não é pega na proxima etapa
         if(match in self.var_to_tokens): return self.var_to_tokens[match]
      
         token_value = hex(self.token_count)  
@@ -153,8 +154,7 @@ class Parser:
         return token_value
     
     def tokenize_var(self, text): #Tokeniza as variaveis e substitui elas na expressão original para ser tokenizada novamente no futuro mas como expressões
-        pattern = r'[a-zA-Z0-9]+' #Literalmente(trocadilho proposital) de a a Z, uma ou mais vezes
-        matches = regex.findall(pattern, text, regex.VERSION1)
+        matches = regex.findall(patterns.PROPOSITIONS, text, regex.VERSION1)
 
         for match in matches:
             if not match in self.variable_lists: #Evitar de tokenizar a mesma variável mais de uma vez
@@ -185,7 +185,7 @@ class Parser:
                             
 
     def get_op(self, exp):
-        op = regex.search(self.op_pattern, exp, regex.VERSION1) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
+        op = regex.search(patterns.OPERATOR, exp, regex.VERSION1) #Pega o operador lógico da expressão, assumindo que só tem um operador lógico na expressão
         if(op == None): return None #Sem operadores
         else: op = op.group(0)
         return op
@@ -193,55 +193,40 @@ class Parser:
     def is_expr_low_complexity(self, expr):
         op = self.get_op(expr)
         if(op == None): return False
-        pattern = rf'([^{op}]+)\{op}([^{op}]+)' #Formata o padrão da regex pra usar o operador op, não botei fé quando isso funcionou
-        if(regex.match(pattern, expr, regex.VERSION1) == None): return False    
-        matches = regex.findall(pattern, expr, regex.VERSION1)[0]
+        if(regex.match(patterns.SIMPLE_EXPRESSION_WILDCARD.replace("*", op), expr, regex.VERSION1) == None): return False    
+        matches = regex.findall(patterns.SIMPLE_EXPRESSION_WILDCARD.replace("*", op), expr, regex.VERSION1)[0]
         for i in matches:
             if(not self.is_expr_low_complexity(i)):
                 return False
         return matches
-
-    def create_canon_and_equivalent(self):
+        
+    def create_canon_equivalence(self, tokens_list, operator):
         for token_id in self.tokens:
             token = self.tokens[token_id][0]
-            if(self.count_op(token) == 0 or self.get_op(token) == "."):
-                self.tokens_canon_and_equivalent[token_id] = self.tokens[token_id][0]
+            if(self.count_op(token) == 0 or self.get_op(token) == operator):
+                tokens_list[token_id] = self.tokens[token_id][0]
             else:
-                self.tokens_canon_and_equivalent[token_id] =self.canonize_simple_exp_and(token)
+                if operator == ".":
+                  tokens_list[token_id] =  self.canonize_simple_exp_and(token)
+                elif operator == "+":
+                    tokens_list[token_id] = self.canonize_simple_exp_or(token)
+                else:
+                    raise ValueError("Operador de create_cannon_equivalence deve ser + ou .")
 
-    def create_canon_or_equivalent(self):
-        for token_id in self.tokens:
-            token = self.tokens[token_id][0]
-            if(self.count_op(token) == 0 or self.get_op(token) == "+"):
-                self.tokens_canon_or_equivalent[token_id] = self.tokens[token_id][0]
-            else:
-                self.tokens_canon_or_equivalent[token_id] =self.canonize_simple_exp_or(token)
-
-    def get_canon_and(self):
-        self.create_canon_and_equivalent()
-        expr = self.tokens_canon_and_equivalent[list(self.tokens_canon_and_equivalent.keys())[-1]]
+    def get_canon(self, from_tokens, operator):
+        self.create_canon_equivalence(from_tokens, operator)
+        expr = from_tokens[list(from_tokens.keys())[-1]]
         while(expr.find("0x") != -1):
-            matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+            matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
             for token in matches:
-                untokenized_exp = self.tokens_canon_and_equivalent[token]
-                replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
-                expr = expr.replace(token, replace_exp)
-        return expr
-    
-    def get_canon_or(self):
-        self.create_canon_or_equivalent()
-        expr = self.tokens_canon_or_equivalent[list(self.tokens_canon_or_equivalent.keys())[-1]]
-        while(expr.find("0x") != -1):
-            matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
-            for token in matches:
-                untokenized_exp = self.tokens_canon_or_equivalent[token]
+                untokenized_exp = from_tokens[token]
                 replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
                 expr = expr.replace(token, replace_exp)
         return expr
     
     def canonize_simple_exp_and(self, expr):
         op = self.get_op(expr)
-        matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+        matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
         match op:
             case "+":
                 return f"~(~{matches[0]}.~{matches[1]})"
@@ -256,7 +241,7 @@ class Parser:
     
     def canonize_simple_exp_or(self, expr):
         op = self.get_op(expr)
-        matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+        matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
         match op:
             case ".":
                 return f"~(~{matches[0]}+~{matches[1]})"
@@ -272,7 +257,7 @@ class Parser:
     def recreate_exp_from_tokens(self):
         expr = self.tokens[list(self.tokens.keys())[-1]][0]
         while(expr.find("0x") != -1):
-            matches = regex.findall(self.token_pattern, expr, regex.VERSION1)
+            matches = regex.findall(patterns.TOKENS, expr, regex.VERSION1)
             for token in matches:
                 untokenized_exp = self.tokens[token][0]
                 replace_exp = f"({untokenized_exp})" if self.count_op(untokenized_exp) != 0 else f"{untokenized_exp}"
@@ -285,8 +270,6 @@ class Parser:
         rexp = self.solve_exp(self.tokens[list(self.tokens.keys())[-1]][0])
        # print(self.tokens)
         return rexp
-  
-     
 
     def create_truth_table(self):
         self.table = None #Limpa a tabela para recalcular
@@ -300,6 +283,7 @@ class Parser:
                 self.table[i][j] = rowBinValue[j] == '1'
         self.table =  self.table[::-1] #Invertendo a orientação da tabela para seguir oq a gente viu em aula, apesar de não fazer diferença
         self.table_len = len(self.table)
+
     def parse_truth_table(self):
         self.variable_lists.sort() #Não faria diferença aqui, PORÉM, é mais dificil de ler a tabela assim, e eu perdi uma quantidade de tempo que não me orgulho tentando arrumar um erro que não existia por causa dessa diferença
         trues = 0
@@ -334,9 +318,13 @@ class Parser:
             exp = self.tokenize_linear_exp(exp)
             self.add_token(exp)
             final_exp = exp
+            token = final_exp
+            if(token in self.var_to_tokens):
+                token = self.var_to_tokens[token]
             for i in range(len(extracted)):
-                extracted[i] =  extracted[i].replace("("+exp+")", self.var_to_tokens[exp])   
-        matches = matches.replace(outer, self.var_to_tokens[final_exp])
+                extracted[i] =  extracted[i].replace("("+exp+")", token)   
+    
+        matches = matches.replace(outer, token)
 
         return matches
 
@@ -357,11 +345,10 @@ class Parser:
         return exp
 
     def count_op(self, exp):
-        return len(regex.findall(self.op_pattern, exp, regex.VERSION1))
+        return len(regex.findall(patterns.OPERATOR, exp, regex.VERSION1))
 
     def find_low_complexity_exp(self, exp, op):
-        pattern = rf'[(~a-zA-Z0-9_]+[\{op}][~a-zA-Z0-9_)]+'
-        matches = regex.findall(pattern, exp, regex.VERSION1)
+        matches = regex.findall(patterns.FINAL_EXPRESSION_WILDCARD.replace("*", op), exp, regex.VERSION1)
         if(matches == None): print("Expressão Invalida ", exp, "com operador", op)
         return matches
 
@@ -376,9 +363,10 @@ class Parser:
             parenthesis_step = (self.extract_all_parentheses(tokenized))
             if(not self.is_linear(tokenized)):
                 tokenized = self.linearize_parenthesis(parenthesis_step, tokenized) 
-            
-            if(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 and
-                self.tokens[list(self.tokens.keys())[-1]][0].find("~") == -1 ): self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores E não negada, isso significa que o penultimo é a resolução real, então remove ele
+           # 
+           # while(self.count_op(self.tokens[list(self.tokens.keys())[-1]][0]) == 0 and
+               # self.tokens[list(self.tokens.keys())[-1]][0].find("~") == -1 ): 
+                #self.tokens.popitem() #Caso o ultimo token seja uma expressão sem operadores E não negada, isso significa que o penultimo é a resolução real, então remove ele
         self.tokenize_linear_exp(tokenized)
         
 
@@ -474,15 +462,20 @@ def parse_expression_input(exp):
         expr1.solve(exp)
         expr1.create_truth_table()
         expr1.parse_truth_table()
-        print("Forma canônica E: " + expr1.get_canon_and())
-        print("Forma canônica OU: " + expr1.get_canon_or())
-        print("")
+        print(expr1.tokens)
+        print("Forma canônica E: " + expr1.get_canon(expr1.tokens_canon_and_equivalent, "."))
+        print("Forma canônica OU: " + expr1.get_canon(expr1.tokens_canon_or_equivalent, "+"))
+        print( "\n", expr1.tokens_canon_and_equivalent, "\n", expr1.tokens_canon_or_equivalent, "\n", expr1.tokens_simplified)
 def main():
     '''
      
     '''
     inp = ""
-    while(1):
+    #parse_expression_input("~(((a)))")
+    #parse_expression_input("c.((((a+b))))")
+    #parse_expression_input("(p>q).(p>~q)")
+    parse_expression_input("(p.~p)")
+    while(0):
      
 
             print(
@@ -502,7 +495,6 @@ def main():
                 "Favor reportar qualquer erro que encontrar.\n"
             )
             inp = input("Digite sua equação: ").replace(" ", "")
-            v = Parser()
             if(inp == "exit" or inp == ""):
                 return
             parse_expression_input(inp)
