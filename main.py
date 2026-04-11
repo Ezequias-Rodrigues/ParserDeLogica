@@ -416,7 +416,7 @@ class Parser:
                 simplifiable = regex.findall(patterns.DOUBLE_NEGATION, expr, regex.VERSION1)
                 for simplifieer in simplifiable:
         
-                    proposition = filter(None, regex.findall(patterns.PROPOSITIONS, simplifieer, regex.VERSION1)[0])
+                    proposition = list(filter(None, regex.findall(patterns.PROPOSITIONS, simplifieer, regex.VERSION1)))[0]
                     expr = expr.replace(simplifieer, proposition)
                     one_more_step = True
 
